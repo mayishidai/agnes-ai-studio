@@ -110,6 +110,8 @@ drama_pause_events = {}
 drama_merge_pause_events = {}
 # 素材重生成跟踪：drama_id -> {asset_index: threading.Event}
 drama_asset_regen_events = {}
+# 故事+剧本编辑暂停事件：Step 1 完成后等待用户编辑确认
+drama_edit_pause_events = {}
 
 
 # ==================== 短剧流水线 ====================
@@ -166,6 +168,22 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
         except Exception as e:
             _update(status='failed', message=f'剧本生成失败: {e}')
             return
+
+        # ---- 暂停等待用户编辑故事+剧本 ----
+        _update(status='paused_edit', step='paused_edit', message='故事和剧本已生成，请编辑后确认继续（2分钟未确认自动继续）')
+        print(f"[短剧 {drama_id}] Step 1 完成，暂停等待用户编辑故事+剧本...")
+        edit_pause_event = drama_edit_pause_events.get(drama_id)
+        if edit_pause_event:
+            confirmed = edit_pause_event.wait(timeout=120)
+            if confirmed:
+                print(f"[短剧 {drama_id}] 用户已编辑确认，继续 Step 2...")
+                with drama_lock:
+                    story_text = drama_tasks[drama_id].get('story', story_text)
+                    script_text = drama_tasks[drama_id].get('script', script_text)
+            else:
+                print(f"[短剧 {drama_id}] 编辑等待超时（2分钟），自动继续 Step 2...")
+                _update(message='编辑超时，自动继续生成分镜...')
+        if _is_shutdown(): return
 
         # ---- Step 2: 生成分镜 ----
         if _is_shutdown(): return
@@ -675,6 +693,7 @@ def drama_start():
         }
         drama_pause_events[drama_id] = threading.Event()
         drama_merge_pause_events[drama_id] = threading.Event()
+        drama_edit_pause_events[drama_id] = threading.Event()
         drama_asset_regen_events[drama_id] = {}
 
     thread = threading.Thread(target=drama_pipeline, args=(drama_id, api_key, text_api_key), daemon=True)
@@ -703,6 +722,64 @@ def drama_resume():
     pause_event.set()
     print(f"[短剧 {drama_id}] 用户确认参考图，流水线已恢复")
     return jsonify({'success': True, 'message': '已确认，继续生成视频...'})
+
+
+@drama_bp.route('/api/drama/edit/story', methods=['POST'])
+def drama_edit_story():
+    """编辑故事梗概"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    story = data.get('story', '')
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+    
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        drama['story'] = story
+    
+    return jsonify({'success': True, 'message': '故事已更新'})
+
+
+@drama_bp.route('/api/drama/edit/script', methods=['POST'])
+def drama_edit_script():
+    """编辑剧本"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    script = data.get('script', '')
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+    
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        drama['script'] = script
+    
+    return jsonify({'success': True, 'message': '剧本已更新'})
+
+
+@drama_bp.route('/api/drama/edit/confirm', methods=['POST'])
+def drama_edit_confirm():
+    """用户编辑完成后确认继续"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+
+    edit_pause_event = drama_edit_pause_events.get(drama_id)
+    if not edit_pause_event:
+        return jsonify({'success': False, 'error': '任务不存在或无需确认'}), 404
+
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama or drama.get('status') != 'paused_edit':
+            return jsonify({'success': False, 'error': '当前状态无需确认'}), 400
+
+    edit_pause_event.set()
+    print(f"[短剧 {drama_id}] 用户编辑完成，流水线继续")
+    return jsonify({'success': True, 'message': '已确认，继续生成分镜...'})
 
 
 @drama_bp.route('/api/drama/merge/confirm', methods=['POST'])

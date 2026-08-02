@@ -800,7 +800,7 @@
                 <div id="dramaStorySection" style="display:none;margin-top:16px;">
                     <div class="card" style="background:var(--surface2);">
                         <div class="card-header">📖 故事梗概</div>
-                        <pre id="dramaStoryContent" style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;max-height:250px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);"></pre>
+                        <textarea id="dramaStoryContent" style="font-size:13px;color:var(--text);width:100%;min-height:150px;max-height:300px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);resize:vertical;line-height:1.7;font-family:inherit;"></textarea>
                     </div>
                 </div>
 
@@ -808,7 +808,15 @@
                 <div id="dramaScriptSection" style="display:none;margin-top:16px;">
                     <div class="card" style="background:var(--surface2);">
                         <div class="card-header">📝 剧本</div>
-                        <pre id="dramaScriptContent" style="font-size:12px;color:var(--text);white-space:pre-wrap;max-height:400px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);"></pre>
+                        <textarea id="dramaScriptContent" style="font-size:12px;color:var(--text);width:100%;min-height:250px;max-height:500px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);resize:vertical;line-height:1.7;font-family:inherit;"></textarea>
+                    </div>
+                </div>
+
+                <!-- 编辑确认按钮 -->
+                <div id="dramaEditConfirmSection" style="display:none;margin-top:12px;">
+                    <div style="background:linear-gradient(135deg, #3498db 0%, #2980b9 100%);border-radius:var(--radius);padding:16px;text-align:center;">
+                        <div style="font-size:14px;color:#fff;margin-bottom:12px;">✏️ 故事和剧本已生成，您可以直接编辑上方内容，确认后继续</div>
+                        <button id="dramaEditConfirmBtn" class="btn btn-primary" style="background:#fff;color:#2980b9;font-weight:700;padding:10px 32px;" onclick="confirmEdit()">✅ 编辑完成，继续生成分镜</button>
                     </div>
                 </div>
 
@@ -1718,6 +1726,39 @@
             }
         }
 
+        async function confirmEdit() {
+            const story = document.getElementById('dramaStoryContent').value;
+            const script = document.getElementById('dramaScriptContent').value;
+            try {
+                // 保存编辑后的故事和剧本
+                await fetch('/api/drama/edit/story', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId, story: story })
+                });
+                await fetch('/api/drama/edit/script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId, script: script })
+                });
+                // 确认继续
+                const resp = await fetch('/api/drama/edit/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    document.getElementById('dramaEditConfirmSection').style.display = 'none';
+                    showToast('编辑完成，继续生成分镜...', 'success');
+                } else {
+                    showToast(data.error || '操作失败', 'error');
+                }
+            } catch (err) {
+                showToast('操作失败: ' + err.message, 'error');
+            }
+        }
+
         async function resumeDrama() {
             const btn = document.getElementById('dramaResumeBtn');
             btn.disabled = true;
@@ -2040,7 +2081,7 @@
                 // 更新步骤标签
                 const stepLabels = {
                     'pending': '等待中', 'step1': '① 生成故事+剧本...', 'step2': '② 生成分镜...',
-                    'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'step4': '④ 生成视频...', 'paused_merge': '⏸ 镜头合并确认', 'waiting_retry': '⟳ 等待失败镜头重试', 'merging': '⑤ 拼接完整视频...', 'completed': '✅ 完成', 'failed': '❌ 失败'
+                    'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'step4': '④ 生成视频...', 'paused_merge': '⏸ 镜头合并确认', 'waiting_retry': '⟳ 等待失败镜头重试', 'merging': '⑤ 拼接完整视频...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'paused_edit': '✏️ 请编辑故事+剧本'
                 };
                 document.getElementById('dramaStepBadge').textContent = stepLabels[data.status] || data.status;
                 document.getElementById('dramaMessage').textContent = data.message || '';
@@ -2048,14 +2089,21 @@
                 // 显示故事
                 if (data.story) {
                     document.getElementById('dramaStorySection').style.display = 'block';
-                    document.getElementById('dramaStoryContent').textContent = data.story;
+                    document.getElementById('dramaStoryContent').value = data.story;
                 }
 
                 // 显示剧本（现在是纯文本格式）
                 if (data.script) {
                     document.getElementById('dramaScriptSection').style.display = 'block';
                     const scriptText = typeof data.script === 'string' ? data.script : JSON.stringify(data.script, null, 2);
-                    document.getElementById('dramaScriptContent').textContent = scriptText;
+                    document.getElementById('dramaScriptContent').value = scriptText;
+                }
+
+                // 编辑确认按钮
+                if (data.status === 'paused_edit') {
+                    document.getElementById('dramaEditConfirmSection').style.display = 'block';
+                } else {
+                    document.getElementById('dramaEditConfirmSection').style.display = 'none';
                 }
 
                 // 显示分镜
