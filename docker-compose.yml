@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  agnes-ai-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: agnes-ai-studio:latest
+    container_name: agnes-ai-studio
+    ports:
+      - "5000:5000"
+    volumes:
+      # 配置文件持久化
+      - ./data/config.json:/app/config.json
+      # 数据目录持久化
+      - ./data/videos:/app/data/videos
+      - ./data/pictures:/app/data/pictures
+      - ./data/dramas:/app/data/dramas
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
