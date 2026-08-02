@@ -14,6 +14,59 @@ from ..config import get_app_dir, get_vendor_base_url, BASE_URL, shutdown_event
 from ..models import video_tasks, task_lock
 
 
+def build_agnesapi_url(base_url):
+    """根据 API Base URL 构造 agnesapi 端点 URL
+
+    agnesapi 端点在域名根路径（无 /v1 前缀）：
+    https://api.agnes-ai.cn/v1  ->  https://api.agnes-ai.cn/agnesapi
+    """
+    base = base_url.rstrip('/')
+    if base.endswith('/v1'):
+        base = base[:-3]
+    return base + '/agnesapi'
+
+
+def fetch_video_url_from_agnesapi(base_url, video_id, api_key):
+    """通过官方推荐端点 /agnesapi 获取视频下载 URL
+
+    Args:
+        base_url: API Base URL（如 https://api.agnes-ai.cn/v1）
+        video_id: 创建任务时返回的 video_id
+        api_key: API Key
+
+    Returns:
+        视频 URL 字符串，失败返回空字符串
+    """
+    if not video_id:
+        return ''
+    try:
+        url = f"{build_agnesapi_url(base_url)}?video_id={video_id}"
+        headers = {'Authorization': f'Bearer {api_key}'}
+        print(f"[视频URL] 通过 agnesapi 端点获取: {url[:120]}...")
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            video_url = (
+                data.get('url')
+                or data.get('video_url')
+                or data.get('output_url')
+                or ''
+            )
+            if not video_url and isinstance(data.get('metadata'), dict):
+                meta = data['metadata']
+                video_url = meta.get('url', '') or meta.get('video_url', '') or meta.get('output_url', '')
+            if video_url:
+                print(f"[视频URL] agnesapi 端点获取成功: {video_url[:150]}")
+            else:
+                print(f"[视频URL] agnesapi 端点响应中未找到 url 字段: {json.dumps(data, ensure_ascii=False)[:300]}")
+            return video_url
+        else:
+            print(f"[视频URL] agnesapi 端点响应异常: HTTP {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        print(f"[视频URL] agnesapi 端点请求失败: {type(e).__name__}: {e}")
+    return ''
+
+
 def download_and_save_file(url, subdir, prefix, ext, max_retries=3):
     """从 URL 下载文件并保存到本地目录（支持重试）
     
@@ -138,6 +191,10 @@ def poll_video_status(task_id, api_key, model=None):
                             if not video_url and isinstance(result.get('metadata'), dict):
                                 meta = result['metadata']
                                 video_url = meta.get('video_url', '') or meta.get('url', '') or meta.get('output_url', '')
+                            # 官方推荐方式：通过 /agnesapi 端点 + video_id 获取视频 URL
+                            if not video_url:
+                                video_id = video_tasks[task_id].get('video_id', '')
+                                video_url = fetch_video_url_from_agnesapi(base_url, video_id, api_key)
                             if not video_url:
                                 try:
                                     content_resp = requests.get(f'{base_url}/videos/{task_id}/content', headers=headers, timeout=30)

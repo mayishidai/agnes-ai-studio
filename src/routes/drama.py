@@ -24,7 +24,7 @@ from ..services.text_model import (
     story_system_prompt, script_system_prompt, storyboard_system_prompt, assets_system_prompt,
     build_video_prompt, sanitize_image_prompt
 )
-from ..services.video_gen import download_and_save_file
+from ..services.video_gen import download_and_save_file, fetch_video_url_from_agnesapi
 from ..services.video_merge import merge_videos, burn_chinese_subtitle
 
 
@@ -436,6 +436,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
 
                 # 视频提交重试（队列满时等待重试）
                 vtask_id = None
+                v_video_id = None
                 max_submit_retries = 3
                 use_negative_prompt = True
                 for submit_attempt in range(max_submit_retries + 1):
@@ -443,6 +444,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                     if resp.status_code == 200:
                         vdata = resp.json()
                         vtask_id = vdata.get('task_id') or vdata.get('video_id')
+                        v_video_id = vdata.get('video_id') or vtask_id
                         break
                     elif resp.status_code == 400 and use_negative_prompt and 'negative_prompt' in resp.text.lower():
                         # API 不支持 negative_prompt，去掉后重试
@@ -493,9 +495,13 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                                     v_url = meta.get('video_url', '') or meta.get('url', '') or meta.get('output_url', '')
                                     if not v_url and isinstance(meta.get('size_mapping'), dict):
                                         v_url = meta['size_mapping'].get('video_url', '') or meta['size_mapping'].get('url', '')
+                                # 官方推荐方式：通过 /agnesapi 端点 + video_id 获取视频 URL
+                                if not v_url and v_video_id:
+                                    v_url = fetch_video_url_from_agnesapi(vid_base_url, v_video_id, vid_api_key)
                                 if not v_url:
                                     try:
                                         content_resp = requests.get(f'{vid_base_url}/videos/{vtask_id}/content', headers=headers, timeout=30)
+                                        print(f"[短剧 {drama_id}] 镜头 {shot_idx+1} content 端点响应: {content_resp.status_code}, url: {content_resp.url}, 内容: {content_resp.text[:300]}")
                                         if content_resp.status_code == 200:
                                             content_data = content_resp.json()
                                             v_url = content_data.get('url', '') or content_data.get('video_url', '') or content_data.get('video', '')
@@ -1105,6 +1111,7 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
 
         # 提交视频任务
         vtask_id = None
+        v_video_id = None
         max_submit_retries = 3
         use_negative_prompt = True
         for submit_attempt in range(max_submit_retries + 1):
@@ -1112,6 +1119,7 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
             if resp.status_code == 200:
                 vdata = resp.json()
                 vtask_id = vdata.get('task_id') or vdata.get('video_id')
+                v_video_id = vdata.get('video_id') or vtask_id
                 break
             elif resp.status_code == 400 and use_negative_prompt and 'negative_prompt' in resp.text.lower():
                 print(f"[镜头重生成] 视频模型不支持 negative_prompt 参数，已移除")
@@ -1156,6 +1164,12 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
                     v_url = content_data.get('url', '') or content_data.get('video_url', '')
                     if not v_url and isinstance(content_data, dict):
                         v_url = content_data.get('url', '') or content_data.get('video_url', '')
+                    if not v_url and isinstance(pr_data.get('metadata'), dict):
+                        meta = pr_data['metadata']
+                        v_url = meta.get('url', '') or meta.get('video_url', '')
+                    # 官方推荐方式：通过 /agnesapi 端点 + video_id 获取视频 URL
+                    if not v_url and v_video_id:
+                        v_url = fetch_video_url_from_agnesapi(vid_base_url, v_video_id, vid_api_key)
                     break
                 elif v_status == 'failed':
                     with drama_lock:

@@ -1,0 +1,5 @@
+*.pyc
+/dramas
+/pictures
+/videos
+config.json

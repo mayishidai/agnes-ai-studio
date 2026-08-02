@@ -96,14 +96,14 @@ def resolve_image_url(image_url):
 
 # ==================== 常量配置 ====================
 
-BASE_URL = "https://apihub.agnes-ai.cn/v1"
+BASE_URL = "https://api.agnes-ai.cn/v1"
 
 # 全局关闭事件：用于通知所有后台线程退出
 shutdown_event = threading.Event()
 
 # ---------- 厂商 Base URL 映射（通用，文本/图片/视频共用）----------
 VENDOR_BASE_URLS = {
-    'agnes': 'https://apihub.agnes-ai.cn/v1',
+    'agnes': 'https://api.agnes-ai.cn/v1',
     'deepseek': 'https://api.deepseek.com/v1',
     'gpt': 'https://api.openai.com/v1',
     'qwen': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
