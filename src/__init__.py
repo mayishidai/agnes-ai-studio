@@ -36,4 +36,8 @@ def create_app():
     app.register_blueprint(drama_bp)
     app.register_blueprint(files_bp)
 
+    # 蓝图注册完成后，从磁盘恢复短剧任务
+    from .models import load_drama_tasks
+    load_drama_tasks()
+
     return app

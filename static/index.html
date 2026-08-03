@@ -745,6 +745,27 @@
                     输入描述，自动完成 5 步流水线：① 生成故事+剧本 → ② 拆分分镜 → ③ 提取素材并生成三视图 → ④ 逐镜头生成视频 → ⑤ 拼接完整视频
                 </p>
 
+                <!-- 短剧历史列表 -->
+                <div style="margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:13px;font-weight:600;">📋 历史短剧任务</span>
+                            <button class="btn btn-sm" id="btnToggleDramaList" onclick="toggleDramaList()" style="font-size:11px;padding:2px 8px;">▼ 展开</button>
+                        </div>
+                        <button class="btn btn-sm" onclick="loadDramaList()">🔄 刷新</button>
+                    </div>
+                    <div id="dramaListFilters" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+                        <button class="btn btn-sm drama-filter-btn" data-filter="all" style="font-size:11px;padding:3px 10px;background:var(--accent);border-color:var(--accent);">全部</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="completed" style="font-size:11px;padding:3px 10px;">✅ 完成</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="failed" style="font-size:11px;padding:3px 10px;">❌ 失败</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="in_progress" style="font-size:11px;padding:3px 10px;">🔄 进行中</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="paused" style="font-size:11px;padding:3px 10px;">⏸ 暂停</button>
+                    </div>
+                    <div id="dramaListContainer" style="max-height:400px;overflow-y:auto;display:none;">
+                        <p style="font-size:12px;color:var(--text2);padding:8px;">加载中...</p>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">短剧描述</label>
                     <textarea class="form-textarea" id="dramaPrompt" placeholder="描述你想要的短剧内容...&#10;例如：一个女孩在雨中的公交站等车，一位老人递给她一把伞，两人相视而笑" style="min-height:120px;"></textarea>
@@ -774,10 +795,31 @@
                         <select class="form-select" id="dramaVideoModel"></select>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">画风预设</label>
+                        <select class="form-select" id="dramaStylePreset">
+                            <option value="anime" selected>动漫风格 (Anime)</option>
+                            <option value="realistic">写实风格 (Realistic)</option>
+                            <option value="inkwash">水墨风格 (Ink Wash)</option>
+                            <option value="cartoon">卡通风格 (Cartoon)</option>
+                            <option value="cinematic">电影风格 (Cinematic)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn" id="btnOptimizePrompt" onclick="optimizePrompt()" style="width:100%;">✨ AI优化提示词</button>
+                    </div>
+                </div>
 
-                <button class="btn btn-primary" id="btnStartDrama" onclick="startDrama()">
-                    🎭 开始生成短剧
-                </button>
+                <div style="display:flex;gap:12px;">
+                    <button class="btn btn-primary" id="btnStartDrama" onclick="startDrama()" style="flex:1;">
+                        🎭 开始生成短剧
+                    </button>
+                    <button class="btn btn-danger" id="btnCancelDrama" onclick="cancelDrama()" style="display:none;background:var(--error);border-color:var(--error);">
+                        ✕ 取消生成
+                    </button>
+                </div>
 
                 <!-- 短剧进度 -->
                 <div id="dramaProgress" style="display:none;margin-top:20px;">
@@ -799,7 +841,10 @@
                 <!-- 故事结果 -->
                 <div id="dramaStorySection" style="display:none;margin-top:16px;">
                     <div class="card" style="background:var(--surface2);">
-                        <div class="card-header">📖 故事梗概</div>
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📖 故事梗概</span>
+                            <button class="btn btn-sm" id="btnOptimizeStory" onclick="optimizeStoryPrompt()" style="font-size:11px;padding:3px 10px;">✨ AI优化</button>
+                        </div>
                         <textarea id="dramaStoryContent" style="font-size:13px;color:var(--text);width:100%;min-height:150px;max-height:300px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);resize:vertical;line-height:1.7;font-family:inherit;"></textarea>
                     </div>
                 </div>
@@ -807,7 +852,10 @@
                 <!-- 剧本结果 -->
                 <div id="dramaScriptSection" style="display:none;margin-top:16px;">
                     <div class="card" style="background:var(--surface2);">
-                        <div class="card-header">📝 剧本</div>
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📝 剧本</span>
+                            <button class="btn btn-sm" id="btnOptimizeScript" onclick="optimizeScriptPrompt()" style="font-size:11px;padding:3px 10px;">✨ AI优化</button>
+                        </div>
                         <textarea id="dramaScriptContent" style="font-size:12px;color:var(--text);width:100%;min-height:250px;max-height:500px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);resize:vertical;line-height:1.7;font-family:inherit;"></textarea>
                     </div>
                 </div>
@@ -975,6 +1023,10 @@
             checkApiKeyStatus();
             initDropZones();
             loadDramaModels();
+            // 历史任务筛选按钮
+            document.querySelectorAll('.drama-filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => filterDramaList(btn.dataset.filter));
+            });
         });
 
         // 不再在 beforeunload 时自动关闭服务，避免刷新页面导致服务中断
@@ -988,6 +1040,7 @@
             document.getElementById(`tab-${name}`).classList.add('active');
             if (name === 'videoTasks') refreshTaskList();
             if (name === 'localFiles') refreshLocalFiles();
+            if (name === 'drama') loadDramaList();
         }
 
         // ==================== 拖拽上传 ====================
@@ -1726,6 +1779,127 @@
             }
         }
 
+        let dramaListExpanded = false;
+        let currentDramaFilter = 'all';
+        let allDramasData = [];
+        const filterMap = {
+            'completed': ['completed'],
+            'failed': ['failed', 'cancelled'],
+            'in_progress': ['step1','step2','step3','step4','merging','pending','waiting_retry'],
+            'paused': ['paused','paused_edit','paused_merge']
+        };
+
+        function toggleDramaList() {
+            dramaListExpanded = !dramaListExpanded;
+            document.getElementById('dramaListContainer').style.display = dramaListExpanded ? 'block' : 'none';
+            document.getElementById('dramaListFilters').style.display = dramaListExpanded ? 'flex' : 'none';
+            document.getElementById('btnToggleDramaList').textContent = dramaListExpanded ? '▲ 折叠' : '▼ 展开';
+            if (dramaListExpanded && !allDramasData.length) loadDramaList();
+        }
+
+        function filterDramaList(filter) {
+            currentDramaFilter = filter;
+            document.querySelectorAll('.drama-filter-btn').forEach(btn => {
+                const active = btn.dataset.filter === filter;
+                btn.style.background = active ? 'var(--accent)' : '';
+                btn.style.borderColor = active ? 'var(--accent)' : '';
+            });
+            renderDramaList();
+        }
+
+        function renderDramaCard(d) {
+            const statusConfig = {
+                'completed': { color: '#10b981', bg: '#064e3b', label: '✅ 完成' },
+                'failed': { color: '#ef4444', bg: '#7f1d1d', label: '❌ 失败' },
+                'cancelled': { color: '#f59e0b', bg: '#78350f', label: '⚠️ 已取消' },
+                'paused': { color: '#3b82f6', bg: '#1e3a8a', label: '⏸ 暂停' },
+                'paused_edit': { color: '#3b82f6', bg: '#1e3a8a', label: '⏸ 编辑中' },
+                'paused_merge': { color: '#f59e0b', bg: '#78350f', label: '⏸ 待合并' },
+                'step1': { color: '#8b5cf6', bg: '#3b0764', label: '① 故事剧本' },
+                'step2': { color: '#8b5cf6', bg: '#3b0764', label: '② 分镜' },
+                'step3': { color: '#8b5cf6', bg: '#3b0764', label: '③ 三视图' },
+                'step4': { color: '#8b5cf6', bg: '#3b0764', label: '④ 视频生成' },
+                'merging': { color: '#8b5cf6', bg: '#3b0764', label: '⑤ 合并中' },
+                'pending': { color: '#6b7280', bg: '#1f2937', label: '⏳ 等待中' }
+            };
+            const cfg = statusConfig[d.status] || statusConfig['pending'];
+            const shots = d.shots_count || 0;
+            const completed = d.completed_shots || 0;
+            const timeStr = d.created_at ? new Date(d.created_at * 1000).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+            const thumbHtml = d.thumbnail 
+                ? `<div style="width:100%;height:100%;background-image:url('${d.thumbnail}');background-size:cover;background-position:center;border-radius:8px 8px 0 0;"></div>`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:linear-gradient(135deg, #1e293b 0%, #334155 100%);border-radius:8px 8px 0 0;">🎭</div>`;
+            return `
+                <div onclick="openDramaTask('${d.drama_id}')" style="background:var(--surface2);border-radius:8px;cursor:pointer;border:1px solid var(--border);transition:all 0.2s;overflow:hidden;display:flex;flex-direction:column;" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='none';this.style.boxShadow='none'">
+                    <div style="height:120px;overflow:hidden;">${thumbHtml}</div>
+                    <div style="padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:11px;padding:3px 10px;border-radius:12px;color:${cfg.color};background:${cfg.bg};font-weight:600;">${cfg.label}</span>
+                            <span style="font-size:10px;color:var(--text2);">${timeStr}</span>
+                        </div>
+                        <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${d.prompt || '(无描述)'}</div>
+                        <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;">
+                            ${shots > 0 ? `<span>🎬 ${completed}/${shots} 镜头</span>` : ''}
+                            ${d.assets_count > 0 ? `<span>🖼 ${d.assets_count} 素材</span>` : ''}
+                            ${d.merged_video ? '<span>📹 已合并</span>' : ''}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderDramaList() {
+            const container = document.getElementById('dramaListContainer');
+            if (!allDramasData.length) {
+                container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">暂无历史短剧任务</p>';
+                return;
+            }
+            const statuses = filterMap[currentDramaFilter];
+            const filtered = statuses ? allDramasData.filter(d => statuses.includes(d.status)) : allDramasData;
+            if (!filtered.length) {
+                container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">该筛选条件下无任务</p>';
+                return;
+            }
+            container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">${filtered.map(renderDramaCard).join('')}</div>`;
+        }
+
+        async function loadDramaList() {
+            const container = document.getElementById('dramaListContainer');
+            container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">加载中...</p>';
+            try {
+                const resp = await fetch('/api/drama/list');
+                const data = await resp.json();
+                if (!data.success || !data.dramas || !data.dramas.length) {
+                    allDramasData = [];
+                    container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">暂无历史短剧任务</p>';
+                    return;
+                }
+                allDramasData = data.dramas.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+                renderDramaList();
+            } catch (e) {
+                console.error('Failed to load drama list:', e);
+                container.innerHTML = '<p style="font-size:12px;color:var(--error);padding:8px;">加载失败</p>';
+            }
+        }
+
+        async function openDramaTask(dramaId) {
+            currentDramaId = dramaId;
+            document.getElementById('dramaProgress').style.display = 'block';
+            // 重置UI
+            document.getElementById('dramaStorySection').style.display = 'none';
+            document.getElementById('dramaScriptSection').style.display = 'none';
+            document.getElementById('dramaStoryboardSection').style.display = 'none';
+            document.getElementById('dramaAssetsSection').style.display = 'none';
+            document.getElementById('dramaResumeSection').style.display = 'none';
+            document.getElementById('dramaMergeConfirmSection').style.display = 'none';
+            document.getElementById('dramaEditConfirmSection').style.display = 'none';
+            document.getElementById('btnCancelDrama').style.display = 'none';
+            // 开始轮询
+            if (dramaPollingTimer) clearInterval(dramaPollingTimer);
+            dramaPollingTimer = setInterval(pollDramaStatus, 3000);
+            pollDramaStatus();
+            showToast('已切换到历史短剧任务', 'info');
+        }
+
         async function confirmEdit() {
             const story = document.getElementById('dramaStoryContent').value;
             const script = document.getElementById('dramaScriptContent').value;
@@ -1998,6 +2172,7 @@
             const textModel = document.getElementById('dramaTextModel').value;
             const imageModel = document.getElementById('dramaImageModel').value;
             const videoModel = document.getElementById('dramaVideoModel').value;
+            const stylePreset = document.getElementById('dramaStylePreset').value;
             const btn = document.getElementById('btnStartDrama');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading-spinner"></span> 启动中...';
@@ -2013,12 +2188,13 @@
             document.getElementById('dramaVideosSection').style.display = 'none';
             document.getElementById('dramaProgressBar').style.width = '5%';
             document.getElementById('dramaProgressBar').style.background = 'var(--accent)';
+            document.getElementById('btnCancelDrama').style.display = 'inline-flex';
 
             try {
                 const resp = await fetch('/api/drama/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, shot_duration: shotDuration, text_model: textModel, image_model: imageModel, video_model: videoModel })
+                    body: JSON.stringify({ prompt, shot_duration: shotDuration, text_model: textModel, image_model: imageModel, video_model: videoModel, style_preset: stylePreset })
                 });
                 const data = await resp.json();
                 if (data.success) {
@@ -2027,12 +2203,150 @@
                     startDramaPolling();
                 } else {
                     showToast(data.error || '启动失败', 'error');
+                    document.getElementById('btnCancelDrama').style.display = 'none';
                 }
             } catch (e) {
                 showToast('请求失败: ' + e.message, 'error');
+                document.getElementById('btnCancelDrama').style.display = 'none';
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '🎭 开始生成短剧';
+            }
+        }
+
+        async function cancelDrama() {
+            if (!currentDramaId) return;
+            if (!confirm('确定要取消当前短剧生成吗？')) return;
+            try {
+                const resp = await fetch('/api/drama/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已取消', 'success');
+                    document.getElementById('btnCancelDrama').style.display = 'none';
+                } else {
+                    showToast(data.error || '取消失败', 'error');
+                }
+            } catch (e) {
+                showToast('取消失败: ' + e.message, 'error');
+            }
+        }
+
+        // AI优化提示词（通用）
+        async function optimizePromptGeneric(textareaId, btnId, emptyMsg, successMsg) {
+            const textarea = document.getElementById(textareaId);
+            const prompt = textarea.value.trim();
+            if (!prompt) { showToast(emptyMsg, 'error'); return; }
+            const btn = document.getElementById(btnId);
+            btn.disabled = true;
+            btn.textContent = '优化中...';
+            try {
+                const textModel = document.getElementById('dramaTextModel').value;
+                const resp = await fetch('/api/drama/optimize-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, text_model: textModel })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    textarea.value = data.optimized_prompt;
+                    showToast(successMsg, 'success');
+                } else {
+                    showToast(data.error || '优化失败', 'error');
+                }
+            } catch (e) {
+                showToast('优化失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = btnId === 'btnOptimizePrompt' ? '✨ AI优化提示词' : '✨ AI优化';
+            }
+        }
+
+        async function optimizePrompt() {
+            optimizePromptGeneric('dramaPrompt', 'btnOptimizePrompt', '请先输入短剧描述', '提示词已优化');
+        }
+
+        async function optimizeStoryPrompt() {
+            optimizePromptGeneric('dramaStoryContent', 'btnOptimizeStory', '故事内容为空', '故事提示词已优化');
+        }
+
+        async function optimizeScriptPrompt() {
+            optimizePromptGeneric('dramaScriptContent', 'btnOptimizeScript', '剧本内容为空', '剧本提示词已优化');
+        }
+
+        async function optimizeShotPrompt(idx) {
+            const promptEl = document.getElementById(`shot-prompt-${idx}`);
+            const prompt = promptEl.value.trim();
+            if (!prompt) { showToast('提示词为空', 'error'); return; }
+            const btn = document.getElementById(`btn-optimize-shot-${idx}`);
+            btn.disabled = true;
+            btn.textContent = '优化中...';
+            try {
+                const textModel = document.getElementById('dramaTextModel').value;
+                const resp = await fetch('/api/drama/optimize-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, text_model: textModel })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    promptEl.value = data.optimized_prompt;
+                    document.getElementById(`btn-save-shot-${idx}`).style.display = 'inline-flex';
+                    showToast('分镜提示词已优化', 'success');
+                } else {
+                    showToast(data.error || '优化失败', 'error');
+                }
+            } catch (e) {
+                showToast('优化失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✨ 优化提示词';
+            }
+        }
+
+        async function optimizeAssetPrompt(idx) {
+            optimizePromptGeneric(`asset-prompt-${idx}`, `btn-optimize-asset-${idx}`, '提示词为空', '素材提示词已优化');
+        }
+
+        // 保存单个分镜编辑
+        async function saveStoryboardShot(idx) {
+            if (!currentDramaId) return;
+            const btn = document.getElementById(`btn-save-shot-${idx}`);
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+            try {
+                const shots = [];
+                const cards = document.querySelectorAll('[id^="shot-card-"]');
+                cards.forEach((card, i) => {
+                    const match = card.querySelector('div').textContent.match(/镜头 (\d+)/);
+                    shots.push({
+                        shot_index: match ? parseInt(match[1]) : i + 1,
+                        scene_desc: document.getElementById(`shot-scene-${i}`).value,
+                        prompt_en: document.getElementById(`shot-prompt-${i}`).value,
+                        camera: document.getElementById(`shot-camera-${i}`).value,
+                        movement: document.getElementById(`shot-movement-${i}`).value
+                    });
+                });
+                const resp = await fetch('/api/drama/edit/storyboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId, shots })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    btn.style.display = 'none';
+                    showToast('分镜已保存', 'success');
+                } else {
+                    showToast(data.error || '保存失败', 'error');
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 保存';
             }
         }
 
@@ -2106,15 +2420,37 @@
                     document.getElementById('dramaEditConfirmSection').style.display = 'none';
                 }
 
-                // 显示分镜
+                // 显示分镜（可编辑）
                 if (data.storyboard && data.storyboard.shots) {
                     document.getElementById('dramaStoryboardSection').style.display = 'block';
                     const el = document.getElementById('dramaStoryboardContent');
-                    el.innerHTML = data.storyboard.shots.map(s => `
-                        <div style="padding:10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
-                            <div style="font-weight:600;font-size:13px;">镜头 ${s.shot_index} <span style="color:var(--text2);font-weight:400;">[${s.camera || ''}]</span></div>
-                            <div style="font-size:12px;color:var(--text2);margin-top:4px;">${s.scene_desc || ''}</div>
-                            <div style="font-size:11px;color:var(--accent);margin-top:4px;font-family:monospace;">${(s.prompt_en || '').substring(0, 120)}...</div>
+                    el.innerHTML = data.storyboard.shots.map((s, idx) => `
+                        <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);" id="shot-card-${idx}">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div style="font-weight:600;font-size:13px;">镜头 ${s.shot_index} <span style="color:var(--text2);font-weight:400;">[${s.camera || ''}]</span></div>
+                                <div style="display:flex;gap:4px;">
+                                    <button class="btn btn-sm" onclick="optimizeShotPrompt(${idx})" id="btn-optimize-shot-${idx}" style="font-size:10px;padding:2px 8px;">✨ 优化提示词</button>
+                                    <button class="btn btn-sm" onclick="saveStoryboardShot(${idx})" id="btn-save-shot-${idx}" style="font-size:10px;padding:2px 8px;display:none;">💾 保存</button>
+                                </div>
+                            </div>
+                            <div style="margin-bottom:8px;">
+                                <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">场景描述</label>
+                                <textarea id="shot-scene-${idx}" style="width:100%;height:60px;font-size:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px;resize:vertical;" onchange="document.getElementById('btn-save-shot-${idx}').style.display='inline-flex';">${s.scene_desc || ''}</textarea>
+                            </div>
+                            <div style="margin-bottom:8px;">
+                                <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">英文提示词</label>
+                                <textarea id="shot-prompt-${idx}" style="width:100%;height:80px;font-size:11px;font-family:monospace;background:var(--surface2);color:var(--accent);border:1px solid var(--border);border-radius:4px;padding:6px;resize:vertical;" onchange="document.getElementById('btn-save-shot-${idx}').style.display='inline-flex';">${s.prompt_en || ''}</textarea>
+                            </div>
+                            <div style="display:flex;gap:12px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">镜头角度</label>
+                                    <input type="text" id="shot-camera-${idx}" value="${s.camera || ''}" style="width:100%;font-size:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 6px;" onchange="document.getElementById('btn-save-shot-${idx}').style.display='inline-flex';">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px;">运镜方式</label>
+                                    <input type="text" id="shot-movement-${idx}" value="${s.movement || ''}" style="width:100%;font-size:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 6px;" onchange="document.getElementById('btn-save-shot-${idx}').style.display='inline-flex';">
+                                </div>
+                            </div>
                         </div>
                     `).join('');
                 }
@@ -2134,7 +2470,7 @@
                         const retryBtn = isFailed ? `<button style="font-size:11px;color:#fff;background:var(--error);border:none;border-radius:4px;padding:2px 8px;cursor:pointer;" onclick="regenerateAssetImage(${idx})" id="asset-retry-${idx}">重新生成</button>` : '';
                         let imgHtml;
                         if (hasImage) {
-                            imgHtml = `<img src="${imgSrc}" style="width:100%;height:160px;object-fit:cover;" alt="${a.name}" id="asset-img-${idx}">`;
+                            imgHtml = `<img src="${imgSrc}" style="width:100%;height:160px;object-fit:cover;cursor:pointer;" alt="${a.name}" id="asset-img-${idx}" onclick="openLightbox('${imgSrc}')">`;
                         } else if (isGenerating) {
                             imgHtml = `<div style="height:160px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:12px;" id="asset-img-${idx}"><span class="loading-spinner" style="margin-right:6px;"></span>生成中...</div>`;
                         } else {
@@ -2156,7 +2492,10 @@
                                         <button onclick="toggleAssetPrompt(${idx})" style="font-size:10px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:3px;padding:1px 6px;cursor:pointer;">📝 提示词</button>
                                         <div id="asset-prompt-area-${idx}" style="display:none;margin-top:4px;">
                                             <textarea id="asset-prompt-${idx}" style="width:100%;height:80px;font-size:10px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;">${imgPrompt}</textarea>
-                                            <button onclick="regenerateWithPrompt(${idx})" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;margin-top:3px;">✏️ 修改并重新生成</button>
+                                            <div style="display:flex;gap:4px;margin-top:3px;">
+                                                <button onclick="optimizeAssetPrompt(${idx})" id="btn-optimize-asset-${idx}" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;">✨ 优化</button>
+                                                <button onclick="regenerateWithPrompt(${idx})" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;">✏️ 修改并重新生成</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2188,7 +2527,7 @@
                         `;
                     }
                     
-                    // 分镜视频列表
+                    // 分镜视频列表 - 所有镜头都显示重新生成按钮
                     const shotsHtml = data.video_results.map(v => {
                         const videoSrc = v.local_file ? `/dramas/${currentDramaId}/videos/${v.local_file}` : (v.video_url || '');
                         if (v.status === 'completed' && videoSrc) {
@@ -2196,6 +2535,7 @@
                                 <div style="background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px;">
                                     <div style="font-size:13px;font-weight:600;margin-bottom:8px;">镜头 ${v.shot_index} <span style="color:var(--success);font-size:11px;">✓ 完成</span></div>
                                     <video src="${videoSrc}" style="width:100%;max-width:400px;border-radius:var(--radius-sm);" controls></video>
+                                    <button style="font-size:11px;color:#fff;background:var(--accent);border:none;border-radius:4px;padding:4px 12px;cursor:pointer;margin-top:8px;" onclick="regenerateShotVideo(${v.shot_index})" id="shot-retry-${v.shot_index}">🔄 重新生成</button>
                                 </div>
                             `;
                         } else if (v.status === 'failed') {
@@ -2224,15 +2564,48 @@
                     el.innerHTML = mergedHtml + shotsHtml;
                 }
 
-                // 完成或失败时停止轮询
-                if (data.status === 'completed' || data.status === 'failed') {
+                // 完成或失败时停止轮询，隐藏取消按钮
+                if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
                     clearInterval(dramaPollingTimer);
-                    showToast(data.status === 'completed' ? '短剧生成完成！' : '短剧生成失败', data.status === 'completed' ? 'success' : 'error');
+                    document.getElementById('btnCancelDrama').style.display = 'none';
+                    showToast(data.status === 'completed' ? '短剧生成完成！' : (data.status === 'cancelled' ? '已取消' : '短剧生成失败'), data.status === 'completed' ? 'success' : 'error');
                 }
             } catch (e) {
                 console.error('Drama poll error:', e);
             }
         }
+
+        // ========== Lightbox 图片放大查看 ==========
+        function openLightbox(imgSrc) {
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightboxImg');
+            lightboxImg.src = imgSrc;
+            lightbox.style.display = 'flex';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        // 点击遮罩关闭 lightbox
+        document.addEventListener('click', function(e) {
+            const lightbox = document.getElementById('lightbox');
+            if (e.target === lightbox) {
+                closeLightbox();
+            }
+        });
+
+        // ESC 键关闭 lightbox
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        });
     </script>
+
+    <!-- Lightbox 图片放大查看遮罩 -->
+    <div id="lightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; justify-content:center; align-items:center; cursor:pointer;">
+        <img id="lightboxImg" style="max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.5);" />
+    </div>
 </body>
 </html>

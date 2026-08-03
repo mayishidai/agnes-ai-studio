@@ -43,7 +43,17 @@ def call_text_model(system_prompt, user_prompt, api_key, model=None, max_tokens=
                 json=payload,
                 timeout=300
             )
+            # 检查 Content-Type，避免 HTML 错误页被当作 JSON 解析
+            content_type = resp.headers.get('Content-Type', '')
             if resp.status_code == 200:
+                if 'application/json' not in content_type:
+                    # 200 但返回了非 JSON 内容（如 HTML 错误页）
+                    if attempt < max_retries:
+                        wait_sec = 10 * (attempt + 1)
+                        print(f"[文本模型] 响应非 JSON ({content_type})，{wait_sec}秒后重试 ({attempt+1}/{max_retries})...")
+                        time.sleep(wait_sec)
+                        continue
+                    raise Exception(f"文本模型 API 返回非 JSON 响应 (Content-Type: {content_type}): {resp.text[:300]}")
                 result = resp.json()
                 content = result['choices'][0]['message']['content']
                 return content
@@ -68,6 +78,13 @@ def call_text_model(system_prompt, user_prompt, api_key, model=None, max_tokens=
                 time.sleep(wait_sec)
                 continue
             raise Exception(f"文本模型 API 连接失败: {conn_err}")
+        except json.JSONDecodeError as json_err:
+            if attempt < max_retries:
+                wait_sec = 10 * (attempt + 1)
+                print(f"[文本模型] JSON 解析失败，{wait_sec}秒后重试 ({attempt+1}/{max_retries})...")
+                time.sleep(wait_sec)
+                continue
+            raise Exception(f"文本模型 API 返回非 JSON 响应: {json_err}")
 
 
 def parse_json_from_text(text):

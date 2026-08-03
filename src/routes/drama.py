@@ -15,7 +15,7 @@ from ..config import (
     get_custom_models_by_type
 )
 from ..models import (
-    drama_tasks, drama_lock, ensure_drama_dirs,
+    drama_tasks, drama_lock, ensure_drama_dirs, save_drama_task,
     TEXT_MODEL_OPTIONS, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS,
     DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL
 )
@@ -27,8 +27,16 @@ from ..services.text_model import (
 from ..services.video_gen import download_and_save_file, fetch_video_url_from_agnesapi
 from ..services.video_merge import merge_videos, burn_chinese_subtitle
 
+# 画风预设对应的 prompt 前缀
+STYLE_PREMPT_PREFIX = {
+    'anime': 'high quality anime character design sheet, detailed illustration, vibrant colors, clean lineart, soft shading, professional concept art.',
+    'realistic': 'photorealistic character design sheet, ultra detailed, 8k resolution, professional photography, natural lighting, realistic skin texture, cinematic composition.',
+    'inkwash': 'traditional Chinese ink wash painting style, brush strokes, flowing ink, elegant minimalism, watercolor effect, artistic, poetic atmosphere.',
+    'cartoon': 'cartoon character design sheet, bold outlines, bright vivid colors, stylized proportions, fun playful style, clean vector art style.',
+    'cinematic': 'cinematic character design sheet, dramatic lighting, film grain, movie still quality, atmospheric, professional film concept art.',
+}
 
-def build_character_image_prompt(desc):
+def build_character_image_prompt(desc, style_preset='anime'):
     """根据角色描述自动识别角色类型，生成合适的图片 prompt"""
     desc_lower = desc.lower()
     
@@ -50,12 +58,7 @@ def build_character_image_prompt(desc):
     is_plant = any(kw in desc_lower for kw in plant_keywords)
     is_animal = any(kw in desc_lower for kw in animal_keywords)
     
-    base_style = (
-        "high quality anime character design sheet, detailed illustration, "
-        "vibrant colors, clean lineart, soft shading, professional concept art. "
-        "soft natural studio lighting, warm color temperature. "
-        "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
-    )
+    base_style = STYLE_PREMPT_PREFIX.get(style_preset, STYLE_PREMPT_PREFIX['anime'])
     
     if is_plant and not is_animal:
         # 植物角色
@@ -112,7 +115,16 @@ drama_merge_pause_events = {}
 drama_asset_regen_events = {}
 # 故事+剧本编辑暂停事件：Step 1 完成后等待用户编辑确认
 drama_edit_pause_events = {}
-
+# 取消事件：每个短剧任务一个，用于取消流水线
+drama_cancel_events = {}
+# 画风预设选项
+STYLE_PRESETS = {
+    'anime': '动漫风格 (Anime)',
+    'realistic': '写实风格 (Realistic)',
+    'inkwash': '水墨风格 (Ink Wash)',
+    'cartoon': '卡通风格 (Cartoon)',
+    'cinematic': '电影风格 (Cinematic)',
+}
 
 # ==================== 短剧流水线 ====================
 
@@ -121,21 +133,35 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
     if text_api_key is None:
         text_api_key = api_key
 
+    # 获取该任务的取消事件
+    cancel_event = drama_cancel_events.get(drama_id)
+
     def _update(**kwargs):
         with drama_lock:
             if drama_id in drama_tasks:
                 drama_tasks[drama_id].update(kwargs)
+        # 每次状态变更后自动持久化到磁盘
+        save_drama_task(drama_id)
 
     def _is_shutdown():
         return shutdown_event.is_set()
 
+    def _is_cancelled():
+        """检查是否被取消或关闭"""
+        if shutdown_event.is_set():
+            return True
+        if cancel_event and cancel_event.is_set():
+            return True
+        return False
+
     try:
         text_model = drama_tasks[drama_id].get('text_model', DEFAULT_TEXT_MODEL)
+        style_preset = drama_tasks[drama_id].get('style_preset', 'anime')
 
         # ---- Step 1a: 生成故事梗概 ----
         print(f"[短剧 {drama_id}] Step 1a: 生成故事梗概...")
         _update(status='step1', step='step1', message='①a 正在创作故事梗概...')
-        if _is_shutdown(): return
+        if _is_cancelled(): return
 
         try:
             story_text = call_text_model(
@@ -153,7 +179,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
         # ---- Step 1b: 生成专业剧本 ----
         print(f"[短剧 {drama_id}] Step 1b: 生成专业剧本...")
         _update(message='①b 正在将故事改编为拍摄剧本...')
-        if _is_shutdown(): return
+        if _is_cancelled(): return
 
         try:
             script_text = call_text_model(
@@ -183,10 +209,10 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
             else:
                 print(f"[短剧 {drama_id}] 编辑等待超时（2分钟），自动继续 Step 2...")
                 _update(message='编辑超时，自动继续生成分镜...')
-        if _is_shutdown(): return
+        if _is_cancelled(): return
 
         # ---- Step 2: 生成分镜 ----
-        if _is_shutdown(): return
+        if _is_cancelled(): return
         print(f"[短剧 {drama_id}] Step 2: 生成分镜...")
         _update(status='step2', step='step2', message='正在生成分镜脚本...')
 
@@ -208,7 +234,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
             return
 
         # ---- Step 3: 提取素材 + 生成参考图 ----
-        if _is_shutdown(): return
+        if _is_cancelled(): return
         print(f"[短剧 {drama_id}] Step 3: 提取素材并生成参考图...")
         _update(status='step3', step='step3', message='正在提取角色/场景/道具特征...')
 
@@ -242,7 +268,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
         img_success = 0
         img_fail = 0
         for idx, asset in enumerate(all_assets):
-            if _is_shutdown(): return
+            if _is_cancelled(): return
             category = asset.get('category', 'characters')
             cat_label = {'characters': '角色', 'scenes': '场景', 'props': '道具'}.get(category, '素材')
             _update(message=f'生成{cat_label}图 ({idx+1}/{len(all_assets)}): {asset["name"]}...')
@@ -258,12 +284,11 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 else:
                     img_size = '768x1344'
             elif category == 'characters':
-                img_prompt, img_size = build_character_image_prompt(desc)
+                img_prompt, img_size = build_character_image_prompt(desc, style_preset)
             elif category == 'scenes':
+                scene_style = STYLE_PREMPT_PREFIX.get(style_preset, STYLE_PREMPT_PREFIX['anime'])
                 img_prompt = (
-                    f"high quality anime scene design, detailed illustration, vibrant colors, "
-                    f"soft shading, professional concept art, warm color temperature. "
-                    f"soft natural studio lighting. "
+                    f"{scene_style} "
                     f"16:9 horizontal composition, pure white background border. "
                     f"Scene environment design concept art, multiple angles view. "
                     f"Scene description: {desc}. "
@@ -271,10 +296,9 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 )
                 img_size = '1344x768'
             else:
+                prop_style = STYLE_PREMPT_PREFIX.get(style_preset, STYLE_PREMPT_PREFIX['anime'])
                 img_prompt = (
-                    f"high quality anime prop design sheet, detailed illustration, vibrant colors, "
-                    f"soft shading, professional concept art, warm color temperature. "
-                    f"soft natural studio lighting. "
+                    f"{prop_style} "
                     f"9:16 vertical composition, pure white minimalist background, premium prop design board layout. "
                     f"Multiple views: front, side, back, top, detail close-ups. "
                     f"Material and texture details clearly visible. "
@@ -370,7 +394,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
             else:
                 print(f"[短剧 {drama_id}] 等待超时（2分钟），自动继续 Step 4...")
                 _update(message='确认超时，自动继续生成视频...')
-        if _is_shutdown(): return
+        if _is_cancelled(): return
 
         # ---- 等待所有进行中的素材重生成完成 ----
         regen_events = drama_asset_regen_events.get(drama_id, {})
@@ -383,10 +407,10 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                     evt.wait(timeout=300)  # 每个最多等待 5 分钟
                 _update(message='素材重生成完成，开始生成视频...')
                 print(f"[短剧 {drama_id}] 所有素材重生成已完成，继续 Step 4")
-        if _is_shutdown(): return
+        if _is_cancelled(): return
 
         # ---- Step 4: 逐镜头生成视频 ----
-        if _is_shutdown(): return
+        if _is_cancelled(): return
         print(f"[短剧 {drama_id}] Step 4: 逐镜头生成视频...")
         _update(status='step4', step='step4', message='开始逐镜头生成视频...')
 
@@ -395,7 +419,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
         video_results = []
 
         for shot_idx, shot in enumerate(shots):
-            if _is_shutdown(): return
+            if _is_cancelled(): return
             _update(message=f'生成视频 ({shot_idx+1}/{len(shots)}): 分镜 {shot.get("shot_index", shot_idx+1)}...')
 
             shot_chars = [c.lower().strip() for c in shot.get('characters', [])]
@@ -488,7 +512,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
 
                 print(f"[短剧 {drama_id}] 镜头 {shot_idx+1} 开始轮询，task_id={vtask_id}")
                 for poll_i in range(120):
-                    if _is_shutdown(): return
+                    if _is_cancelled(): return
                     if shutdown_event.wait(timeout=10):
                         return
                     try:
@@ -606,7 +630,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 if not confirmed:
                     print(f"[短剧 {drama_id}] 合并确认超时，直接合并已成功的镜头")
                     _update(message='确认超时，直接合并已成功的镜头...')
-            if _is_shutdown(): return
+            if _is_cancelled(): return
             
             # 检查是否需要等待重试失败的镜头
             with drama_lock:
@@ -676,6 +700,7 @@ def drama_start():
     text_model = data.get('text_model', DEFAULT_TEXT_MODEL)
     image_model = data.get('image_model', DEFAULT_IMAGE_MODEL)
     video_model = data.get('video_model', DEFAULT_VIDEO_MODEL)
+    style_preset = data.get('style_preset', 'anime')
     drama_id = uuid.uuid4().hex[:12]
 
     text_api_key = get_vendor_api_key(text_model, fallback_key=api_key)
@@ -685,6 +710,7 @@ def drama_start():
             'drama_id': drama_id, 'status': 'pending', 'step': '',
             'prompt': prompt, 'shot_duration': shot_duration,
             'text_model': text_model, 'image_model': image_model, 'video_model': video_model,
+            'style_preset': style_preset,
             'text_api_key': text_api_key,
             'script': None, 'story': None, 'storyboard': None, 'shots': [],
             'assets': [], 'video_results': [],
@@ -695,9 +721,13 @@ def drama_start():
         drama_merge_pause_events[drama_id] = threading.Event()
         drama_edit_pause_events[drama_id] = threading.Event()
         drama_asset_regen_events[drama_id] = {}
+        drama_cancel_events[drama_id] = threading.Event()
 
     thread = threading.Thread(target=drama_pipeline, args=(drama_id, api_key, text_api_key), daemon=True)
     thread.start()
+
+    # 保存初始任务状态到磁盘
+    save_drama_task(drama_id)
 
     return jsonify({'success': True, 'drama_id': drama_id, 'status': 'pending'})
 
@@ -738,7 +768,7 @@ def drama_edit_story():
         if not drama:
             return jsonify({'success': False, 'error': '任务不存在'}), 404
         drama['story'] = story
-    
+    save_drama_task(drama_id)
     return jsonify({'success': True, 'message': '故事已更新'})
 
 
@@ -756,8 +786,30 @@ def drama_edit_script():
         if not drama:
             return jsonify({'success': False, 'error': '任务不存在'}), 404
         drama['script'] = script
-    
+    save_drama_task(drama_id)
     return jsonify({'success': True, 'message': '剧本已更新'})
+
+
+@drama_bp.route('/api/drama/edit/storyboard', methods=['POST'])
+def drama_edit_storyboard():
+    """编辑分镜脚本"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    shots = data.get('shots', [])
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+    
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        # 更新分镜数据，保留原有字段
+        if drama.get('storyboard'):
+            for i, shot in enumerate(shots):
+                if i < len(drama['storyboard']['shots']):
+                    drama['storyboard']['shots'][i].update(shot)
+    save_drama_task(drama_id)
+    return jsonify({'success': True, 'message': '分镜脚本已更新'})
 
 
 @drama_bp.route('/api/drama/edit/confirm', methods=['POST'])
@@ -849,6 +901,7 @@ def drama_status(drama_id):
             'message': drama.get('message', ''),
             'prompt': drama['prompt'],
             'shot_duration': drama.get('shot_duration', 5),
+            'style_preset': drama.get('style_preset', 'anime'),
             'script': drama.get('script'),
             'story': drama.get('story'),
             'storyboard': drama.get('storyboard'),
@@ -861,23 +914,102 @@ def drama_status(drama_id):
         })
 
 
+@drama_bp.route('/api/drama/style-presets', methods=['GET'])
+def drama_style_presets():
+    """返回画风预设选项"""
+    return jsonify({'success': True, 'presets': STYLE_PRESETS})
+
+
+@drama_bp.route('/api/drama/optimize-prompt', methods=['POST'])
+def drama_optimize_prompt():
+    """AI一键优化提示词"""
+    data = request.get_json()
+    prompt = data.get('prompt', '').strip()
+    if not prompt:
+        return jsonify({'success': False, 'error': '请输入提示词'}), 400
+
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({'success': False, 'error': '请先配置 API Key'}), 401
+
+    try:
+        system = (
+            "你是一个专业的AI绘画提示词优化专家。用户会提供一个中文场景描述，"
+            "你需要将其优化为详细的英文提示词，包含构图、光影、色彩、风格等要素。"
+            "只输出优化后的英文提示词，不要解释。"
+        )
+        user = f"请将以下场景描述优化为详细的AI绘画英文提示词：\n{prompt}"
+        # 使用文本模型专用 API Key（与短剧流水线一致）
+        text_model = data.get('text_model', DEFAULT_TEXT_MODEL)
+        text_api_key = get_vendor_api_key(text_model, fallback_key=api_key)
+        optimized = call_text_model(system, user, text_api_key, model=text_model, max_tokens=1024)
+        return jsonify({'success': True, 'optimized_prompt': optimized.strip()})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'优化失败: {e}'}), 500
+
+
 @drama_bp.route('/api/drama/list', methods=['GET'])
 def drama_list():
     """列出所有短剧任务"""
     with drama_lock:
         items = []
         for did, d in drama_tasks.items():
+            # 获取第一张素材图片作为缩略图
+            assets = d.get('assets', [])
+            thumbnail = None
+            for a in assets:
+                if a.get('local_file'):
+                    thumbnail = f"/dramas/{did}/images/{a['local_file']}"
+                    break
+                elif a.get('image_url'):
+                    thumbnail = a['image_url']
+                    break
+            # 获取合并视频文件名
+            merged_video = d.get('merged_video')
             items.append({
                 'drama_id': d['drama_id'], 'status': d['status'],
-                'prompt': d['prompt'][:60] + ('...' if len(d['prompt']) > 60 else ''),
+                'prompt': d['prompt'][:80] + ('...' if len(d['prompt']) > 80 else ''),
                 'shot_duration': d.get('shot_duration', 5),
                 'shots_count': len(d.get('shots', [])),
                 'completed_shots': sum(1 for v in d.get('video_results', []) if v.get('status') == 'completed'),
-                'assets_count': len(d.get('assets', [])),
+                'assets_count': len(assets),
+                'video_count': len(d.get('video_results', [])),
+                'merged_video': merged_video,
+                'thumbnail': thumbnail,
                 'message': d.get('message', ''),
-                'created_at': d['created_at']
+                'created_at': d['created_at'],
+                'style_preset': d.get('style_preset', 'anime'),
             })
         return jsonify({'success': True, 'dramas': items})
+
+
+@drama_bp.route('/api/drama/cancel', methods=['POST'])
+def drama_cancel():
+    """取消短剧生成流水线"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        if drama.get('status') in ('completed', 'failed', 'cancelled'):
+            return jsonify({'success': False, 'error': '任务已结束，无法取消'}), 400
+
+    # 设置取消事件
+    cancel_event = drama_cancel_events.get(drama_id)
+    if cancel_event:
+        cancel_event.set()
+
+    with drama_lock:
+        drama['status'] = 'cancelled'
+        drama['message'] = '已取消'
+    save_drama_task(drama_id)
+
+    print(f"[短剧 {drama_id}] 用户取消流水线")
+    return jsonify({'success': True, 'message': '已取消'})
 
 
 @drama_bp.route('/api/drama/asset/replace', methods=['POST'])
@@ -918,6 +1050,7 @@ def drama_asset_replace():
         assets[asset_index]['local_file'] = filename
         assets[asset_index]['image_url'] = f'/dramas/{drama_id}/images/{filename}'
         drama['assets'] = list(assets)
+    save_drama_task(drama_id)
 
     print(f"[短剧 {drama_id}] 素材 {asset_index+1} 参考图已手动替换: {filename}")
     return jsonify({
@@ -957,6 +1090,7 @@ def drama_asset_regenerate():
                 return jsonify({'success': False, 'error': '素材索引越界'}), 400
             asset = assets[asset_index]
             api_key = drama.get('api_key', '')
+            style_preset = drama.get('style_preset', 'anime')
 
         category = asset.get('category', 'characters')
         desc = asset.get('desc', '')
@@ -971,12 +1105,11 @@ def drama_asset_regenerate():
                 assets[asset_index]['desc'] = desc
             # 用新 desc 通过模板重建英文 prompt
             if category == 'characters':
-                img_prompt, img_size = build_character_image_prompt(desc)
+                img_prompt, img_size = build_character_image_prompt(desc, style_preset)
             elif category == 'scenes':
+                scene_style = STYLE_PREMPT_PREFIX.get(style_preset, STYLE_PREMPT_PREFIX['anime'])
                 img_prompt = (
-                    f"high quality anime scene design, detailed illustration, vibrant colors, "
-                    f"soft shading, professional concept art, warm color temperature. "
-                    f"soft natural studio lighting. "
+                    f"{scene_style} "
                     f"16:9 horizontal composition, pure white background border. "
                     f"Scene environment design concept art, multiple angles view. "
                     f"Scene description: {desc}. "
@@ -984,10 +1117,9 @@ def drama_asset_regenerate():
                 )
                 img_size = '1344x768'
             else:
+                prop_style = STYLE_PREMPT_PREFIX.get(style_preset, STYLE_PREMPT_PREFIX['anime'])
                 img_prompt = (
-                    f"high quality anime prop design sheet, detailed illustration, vibrant colors, "
-                    f"soft shading, professional concept art, warm color temperature. "
-                    f"soft natural studio lighting. "
+                    f"{prop_style} "
                     f"9:16 vertical composition, pure white minimalist background, premium prop design board layout. "
                     f"Multiple views: front, side, back, top, detail close-ups. "
                     f"Material and texture details clearly visible. "
@@ -1001,7 +1133,7 @@ def drama_asset_regenerate():
                 img_prompt = original_prompt_en
                 img_size = '1344x768' if category == 'scenes' else '768x1344'
             elif category == 'characters':
-                img_prompt, img_size = build_character_image_prompt(desc)
+                img_prompt, img_size = build_character_image_prompt(desc, style_preset)
             elif category == 'scenes':
                 img_prompt = (
                     f"high quality anime scene design, detailed illustration, vibrant colors, "
@@ -1070,6 +1202,7 @@ def drama_asset_regenerate():
             assets[asset_index]['img_prompt'] = img_prompt
             assets[asset_index]['desc'] = desc
             drama['assets'] = list(assets)
+        save_drama_task(drama_id)
 
         print(f"[短剧 {drama_id}] 素材 {asset_index+1} [{name}] 参考图已重新生成: {local}")
         return jsonify({
@@ -1124,6 +1257,7 @@ def drama_shot_regenerate():
         with drama_lock:
             video_results[result_idx] = {'shot_index': shot_index, 'status': 'generating'}
             drama['video_results'] = list(video_results)
+        save_drama_task(drama_id)
 
     # 启动后台线程生成视频
     thread = threading.Thread(
@@ -1138,7 +1272,11 @@ def drama_shot_regenerate():
 
 def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
     """后台线程：重新生成单个镜头视频"""
-    import json as _json
+
+    def _set_result(result):
+        with drama_lock:
+            drama_tasks[drama_id]['video_results'][result_idx] = result
+        save_drama_task(drama_id)
 
     with drama_lock:
         drama = drama_tasks.get(drama_id)
@@ -1209,19 +1347,17 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
                 time.sleep(wait_sec)
                 continue
             else:
-                with drama_lock:
-                    drama_tasks[drama_id]['video_results'][result_idx] = {
-                        'shot_index': shot_index, 'status': 'failed',
-                        'error': f'API {resp.status_code}: {resp.text[:300]}', 'prompt': video_prompt
-                    }
+                _set_result({
+                    'shot_index': shot_index, 'status': 'failed',
+                    'error': f'API {resp.status_code}: {resp.text[:300]}', 'prompt': video_prompt
+                })
                 return
 
         if not vtask_id:
-            with drama_lock:
-                drama_tasks[drama_id]['video_results'][result_idx] = {
-                    'shot_index': shot_index, 'status': 'failed',
-                    'error': '视频任务提交失败', 'prompt': video_prompt
-                }
+            _set_result({
+                'shot_index': shot_index, 'status': 'failed',
+                'error': '视频任务提交失败', 'prompt': video_prompt
+            })
             return
 
         print(f"[镜头重生成] 镜头 {shot_index} 已提交，task_id={vtask_id}")
@@ -1249,21 +1385,19 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
                         v_url = fetch_video_url_from_agnesapi(vid_base_url, v_video_id, vid_api_key)
                     break
                 elif v_status == 'failed':
-                    with drama_lock:
-                        drama_tasks[drama_id]['video_results'][result_idx] = {
-                            'shot_index': shot_index, 'status': 'failed',
-                            'error': pr_data.get('error', '生成失败'), 'prompt': video_prompt
-                        }
+                    _set_result({
+                        'shot_index': shot_index, 'status': 'failed',
+                        'error': pr_data.get('error', '生成失败'), 'prompt': video_prompt
+                    })
                     return
             except Exception as e:
                 print(f"[镜头重生成] 镜头 {shot_index} 轮询异常: {e}")
                 continue
         else:
-            with drama_lock:
-                drama_tasks[drama_id]['video_results'][result_idx] = {
-                    'shot_index': shot_index, 'status': 'failed',
-                    'error': '轮询超时(20分钟)', 'prompt': video_prompt
-                }
+            _set_result({
+                'shot_index': shot_index, 'status': 'failed',
+                'error': '轮询超时(20分钟)', 'prompt': video_prompt
+            })
             return
 
         # 下载视频
@@ -1290,22 +1424,19 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx):
                 except Exception as sub_err:
                     print(f"[镜头重生成] 镜头 {shot_index} 字幕烧录异常: {type(sub_err).__name__}: {sub_err}")
             
-            with drama_lock:
-                drama_tasks[drama_id]['video_results'][result_idx] = {
-                    'shot_index': shot_index, 'status': 'completed',
-                    'video_url': v_url, 'local_file': local_fn, 'prompt': video_prompt
-                }
+            _set_result({
+                'shot_index': shot_index, 'status': 'completed',
+                'video_url': v_url, 'local_file': local_fn, 'prompt': video_prompt
+            })
             print(f"[镜头重生成] 镜头 {shot_index} 完成: {local_fn}")
         else:
-            with drama_lock:
-                drama_tasks[drama_id]['video_results'][result_idx] = {
-                    'shot_index': shot_index, 'status': 'failed',
-                    'error': '视频下载失败', 'prompt': video_prompt
-                }
+            _set_result({
+                'shot_index': shot_index, 'status': 'failed',
+                'error': '视频下载失败', 'prompt': video_prompt
+            })
     except Exception as e:
         print(f"[镜头重生成] 镜头 {shot_index} 异常: {e}")
-        with drama_lock:
-            drama_tasks[drama_id]['video_results'][result_idx] = {
-                'shot_index': shot_index, 'status': 'failed',
-                'error': str(e), 'prompt': video_prompt
-            }
+        _set_result({
+            'shot_index': shot_index, 'status': 'failed',
+            'error': str(e), 'prompt': video_prompt
+        })
