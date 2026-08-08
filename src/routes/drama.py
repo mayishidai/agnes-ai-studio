@@ -985,6 +985,34 @@ def drama_list():
         return jsonify({'success': True, 'dramas': items})
 
 
+@drama_bp.route('/api/drama/optimize-prompt', methods=['POST'])
+def drama_optimize_prompt():
+    """AI一键优化提示词（合并 V7 时曾丢失，从本地 0da6f7e 恢复）"""
+    data = request.get_json()
+    prompt = data.get('prompt', '').strip()
+    if not prompt:
+        return jsonify({'success': False, 'error': '请输入提示词'}), 400
+
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({'success': False, 'error': '请先配置 API Key'}), 401
+
+    try:
+        system = (
+            "你是一个专业的AI绘画提示词优化专家。用户会提供一个中文场景描述，"
+            "你需要将其优化为详细的英文提示词，包含构图、光影、色彩、风格等要素。"
+            "只输出优化后的英文提示词，不要解释。"
+        )
+        user = f"请将以下场景描述优化为详细的AI绘画英文提示词：\n{prompt}"
+        # 使用文本模型专用 API Key（与短剧流水线一致）
+        text_model = data.get('text_model', DEFAULT_TEXT_MODEL)
+        text_api_key = get_vendor_api_key(text_model, fallback_key=api_key)
+        optimized = call_text_model(system, user, text_api_key, model=text_model, max_tokens=1024)
+        return jsonify({'success': True, 'optimized_prompt': optimized.strip()})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'优化失败: {e}'}), 500
+
+
 @drama_bp.route('/api/drama/asset/replace', methods=['POST'])
 def drama_asset_replace():
     """手动替换素材参考图"""

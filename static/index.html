@@ -745,6 +745,27 @@
                     输入描述，自动完成 5 步流水线：① 生成故事+剧本 → ② 拆分分镜 → ③ 提取素材并生成三视图 → ④ 逐镜头生成视频 → ⑤ 拼接完整视频
                 </p>
 
+                <!-- 短剧历史列表（合并 V7 时丢失，已恢复） -->
+                <div style="margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:13px;font-weight:600;">📋 历史短剧任务</span>
+                            <button class="btn btn-sm" id="btnToggleDramaList" onclick="toggleDramaList()" style="font-size:11px;padding:2px 8px;">▼ 展开</button>
+                        </div>
+                        <button class="btn btn-sm" onclick="loadDramaList()">🔄 刷新</button>
+                    </div>
+                    <div id="dramaListFilters" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+                        <button class="btn btn-sm drama-filter-btn" data-filter="all" style="font-size:11px;padding:3px 10px;background:var(--accent);border-color:var(--accent);">全部</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="completed" style="font-size:11px;padding:3px 10px;">✅ 完成</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="failed" style="font-size:11px;padding:3px 10px;">❌ 失败</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="in_progress" style="font-size:11px;padding:3px 10px;">🔄 进行中</button>
+                        <button class="btn btn-sm drama-filter-btn" data-filter="paused" style="font-size:11px;padding:3px 10px;">⏸ 暂停</button>
+                    </div>
+                    <div id="dramaListContainer" style="max-height:400px;overflow-y:auto;display:none;">
+                        <p style="font-size:12px;color:var(--text2);padding:8px;">加载中...</p>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">短剧描述</label>
                     <textarea class="form-textarea" id="dramaPrompt" placeholder="描述你想要的短剧内容...&#10;例如：一个女孩在雨中的公交站等车，一位老人递给她一把伞，两人相视而笑" style="min-height:120px;"></textarea>
@@ -772,6 +793,13 @@
                     <div class="form-group">
                         <label class="form-label">视频模型</label>
                         <select class="form-select" id="dramaVideoModel"></select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn" id="btnOptimizePrompt" onclick="optimizePrompt()" style="width:100%;">✨ AI优化提示词</button>
                     </div>
                 </div>
 
@@ -2320,6 +2348,162 @@
             if (dramaPollingTimer) clearInterval(dramaPollingTimer);
             dramaPollingTimer = setInterval(pollDramaStatus, 8000);
             pollDramaStatus(); // 立即执行一次
+        }
+
+        // ==================== 历史短剧任务（合并 V7 时丢失，已恢复）====================
+        let allDramasData = [];
+        let currentDramaFilter = 'all';
+        const filterMap = {
+            all: null,
+            completed: ['completed'],
+            failed: ['failed'],
+            in_progress: ['step1','step2','step3','step4','merging','pending'],
+            paused: ['paused','paused_edit','paused_merge']
+        };
+
+        function toggleDramaList() {
+            const c = document.getElementById('dramaListContainer');
+            const f = document.getElementById('dramaListFilters');
+            const expanded = c.style.display !== 'none';
+            c.style.display = expanded ? 'none' : 'block';
+            f.style.display = expanded ? 'none' : 'flex';
+            const btn = document.getElementById('btnToggleDramaList');
+            if (btn) btn.textContent = expanded ? '▼ 展开' : '▲ 收起';
+            if (!expanded) loadDramaList();
+        }
+
+        function filterDramaList(filter) {
+            currentDramaFilter = filter;
+            document.querySelectorAll('.drama-filter-btn').forEach(btn => {
+                const active = btn.dataset.filter === filter;
+                btn.style.background = active ? 'var(--accent)' : '';
+                btn.style.borderColor = active ? 'var(--accent)' : '';
+            });
+            renderDramaList();
+        }
+
+        function renderDramaCard(d) {
+            const statusConfig = {
+                'completed': { color: '#10b981', bg: '#064e3b', label: '✅ 完成' },
+                'failed': { color: '#ef4444', bg: '#7f1d1d', label: '❌ 失败' },
+                'cancelled': { color: '#f59e0b', bg: '#78350f', label: '⚠️ 已取消' },
+                'paused': { color: '#3b82f6', bg: '#1e3a8a', label: '⏸ 暂停' },
+                'paused_edit': { color: '#3b82f6', bg: '#1e3a8a', label: '⏸ 编辑中' },
+                'paused_merge': { color: '#f59e0b', bg: '#78350f', label: '⏸ 待合并' },
+                'step1': { color: '#8b5cf6', bg: '#3b0764', label: '① 故事剧本' },
+                'step2': { color: '#8b5cf6', bg: '#3b0764', label: '② 分镜' },
+                'step3': { color: '#8b5cf6', bg: '#3b0764', label: '③ 三视图' },
+                'step4': { color: '#8b5cf6', bg: '#3b0764', label: '④ 视频生成' },
+                'merging': { color: '#8b5cf6', bg: '#3b0764', label: '⑤ 合并中' },
+                'pending': { color: '#6b7280', bg: '#1f2937', label: '⏳ 等待中' }
+            };
+            const cfg = statusConfig[d.status] || statusConfig['pending'];
+            const shots = d.shots_count || 0;
+            const completed = d.completed_shots || 0;
+            const timeStr = d.created_at ? new Date(d.created_at * 1000).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+            const thumbHtml = d.thumbnail
+                ? `<div style="width:100%;height:100%;background-image:url('${d.thumbnail}');background-size:cover;background-position:center;border-radius:8px 8px 0 0;"></div>`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:linear-gradient(135deg, #1e293b 0%, #334155 100%);border-radius:8px 8px 0 0;">🎭</div>`;
+            return `
+                <div onclick="openDramaTask('${d.drama_id}')" style="background:var(--surface2);border-radius:8px;cursor:pointer;border:1px solid var(--border);transition:all 0.2s;overflow:hidden;display:flex;flex-direction:column;" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='none';this.style.boxShadow='none'">
+                    <div style="height:120px;overflow:hidden;">${thumbHtml}</div>
+                    <div style="padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:11px;padding:3px 10px;border-radius:12px;color:${cfg.color};background:${cfg.bg};font-weight:600;">${cfg.label}</span>
+                            <span style="font-size:10px;color:var(--text2);">${timeStr}</span>
+                        </div>
+                        <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${d.prompt || '(无描述)'}</div>
+                        <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;">
+                            ${shots > 0 ? `<span>🎬 ${completed}/${shots} 镜头</span>` : ''}
+                            ${d.assets_count > 0 ? `<span>🖼 ${d.assets_count} 素材</span>` : ''}
+                            ${d.merged_video ? '<span>📹 已合并</span>' : ''}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderDramaList() {
+            const container = document.getElementById('dramaListContainer');
+            if (!allDramasData.length) {
+                container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">暂无历史短剧任务</p>';
+                return;
+            }
+            const statuses = filterMap[currentDramaFilter];
+            const filtered = statuses ? allDramasData.filter(d => statuses.includes(d.status)) : allDramasData;
+            if (!filtered.length) {
+                container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">该筛选条件下无任务</p>';
+                return;
+            }
+            container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">${filtered.map(renderDramaCard).join('')}</div>`;
+        }
+
+        async function loadDramaList() {
+            const container = document.getElementById('dramaListContainer');
+            container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">加载中...</p>';
+            try {
+                const resp = await fetch('/api/drama/list');
+                const data = await resp.json();
+                if (!data.success || !data.dramas || !data.dramas.length) {
+                    allDramasData = [];
+                    container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">暂无历史短剧任务</p>';
+                    return;
+                }
+                allDramasData = data.dramas.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+                renderDramaList();
+            } catch (e) {
+                console.error('Failed to load drama list:', e);
+                container.innerHTML = '<p style="font-size:12px;color:var(--error);padding:8px;">加载失败</p>';
+            }
+        }
+
+        async function openDramaTask(dramaId) {
+            currentDramaId = dramaId;
+            localStorage.setItem('currentDramaId', dramaId);
+            document.getElementById('dramaProgress').style.display = 'block';
+            switchTab('drama');
+            startDramaPolling();
+            showToast('已打开历史短剧任务', 'info');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.drama-filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => filterDramaList(btn.dataset.filter));
+            });
+            loadDramaList();
+        });
+
+        // ==================== AI 优化提示词（合并 V7 时丢失，已恢复）====================
+        async function optimizePromptGeneric(textareaId, btnId, emptyMsg, successMsg) {
+            const textarea = document.getElementById(textareaId);
+            const prompt = textarea.value.trim();
+            if (!prompt) { showToast(emptyMsg, 'error'); return; }
+            const btn = document.getElementById(btnId);
+            btn.disabled = true;
+            btn.textContent = '优化中...';
+            try {
+                const textModel = document.getElementById('dramaTextModel').value;
+                const resp = await fetch('/api/drama/optimize-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, text_model: textModel })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    textarea.value = data.optimized_prompt;
+                    showToast(successMsg, 'success');
+                } else {
+                    showToast(data.error || '优化失败', 'error');
+                }
+            } catch (e) {
+                showToast('优化失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = btnId === 'btnOptimizePrompt' ? '✨ AI优化提示词' : '✨ AI优化';
+            }
+        }
+
+        async function optimizePrompt() {
+            optimizePromptGeneric('dramaPrompt', 'btnOptimizePrompt', '请先输入短剧描述', '提示词已优化');
         }
 
         async function pollDramaStatus() {

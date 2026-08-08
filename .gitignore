@@ -4,3 +4,5 @@
 /videos
 config.json
 data/
+# 运行日志
+*.log
