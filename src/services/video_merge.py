@@ -204,12 +204,14 @@ def _find_chinese_font():
     return None
 
 
-def merge_videos(drama_id, video_results):
+def merge_videos(drama_id, video_results, shot_order=None, output_prefix='merged'):
     """使用 ffmpeg 将多个分镜视频拼接为一个完整视频
     
     Args:
         drama_id: 短剧 ID
         video_results: 视频结果列表（包含 local_file 字段）
+        shot_order: 可选，指定镜头顺序 [shot_index, ...]。为 None 时按 shot_index 排序
+        output_prefix: 输出文件名前缀
     
     Returns:
         合并后的文件名，失败返回 None
@@ -219,13 +221,29 @@ def merge_videos(drama_id, video_results):
         print(f"[短剧 {drama_id}] 警告: 未找到 ffmpeg，跳过视频拼接")
         return None
     
-    success_videos = []
-    for v in sorted(video_results, key=lambda x: x.get('shot_index', 0)):
-        if v.get('status') == 'completed' and v.get('local_file'):
-            app_dir = get_app_dir()
-            full_path = os.path.join(app_dir, 'dramas', drama_id, 'videos', v['local_file'])
-            if os.path.exists(full_path) and os.path.getsize(full_path) > 0:
-                success_videos.append(full_path)
+    # 按指定顺序或默认排序获取视频
+    if shot_order:
+        # 按用户指定顺序
+        result_map = {}
+        for v in video_results:
+            if v.get('status') == 'completed' and v.get('local_file'):
+                result_map[v.get('shot_index')] = v
+        success_videos = []
+        for si in shot_order:
+            v = result_map.get(si)
+            if v:
+                app_dir = get_app_dir()
+                full_path = os.path.join(app_dir, 'dramas', drama_id, 'videos', v['local_file'])
+                if os.path.exists(full_path) and os.path.getsize(full_path) > 0:
+                    success_videos.append(full_path)
+    else:
+        success_videos = []
+        for v in sorted(video_results, key=lambda x: x.get('shot_index', 0)):
+            if v.get('status') == 'completed' and v.get('local_file'):
+                app_dir = get_app_dir()
+                full_path = os.path.join(app_dir, 'dramas', drama_id, 'videos', v['local_file'])
+                if os.path.exists(full_path) and os.path.getsize(full_path) > 0:
+                    success_videos.append(full_path)
     
     if len(success_videos) < 2:
         print(f"[短剧 {drama_id}] 成功视频少于 2 个，跳过拼接")
@@ -244,7 +262,7 @@ def merge_videos(drama_id, video_results):
                 f.write(f"file '{safe_path}'\n")
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_file = f'merged_{timestamp}.mp4'
+        output_file = f'{output_prefix}_{timestamp}.mp4'
         output_path = os.path.join(videos_dir, output_file)
         
         cmd = [

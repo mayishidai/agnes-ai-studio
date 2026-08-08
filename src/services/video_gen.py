@@ -14,57 +14,84 @@ from ..config import get_app_dir, get_vendor_base_url, BASE_URL, shutdown_event
 from ..models import video_tasks, task_lock
 
 
-def build_agnesapi_url(base_url):
-    """根据 API Base URL 构造 agnesapi 端点 URL
-
-    agnesapi 端点在域名根路径（无 /v1 前缀）：
-    https://api.agnes-ai.cn/v1  ->  https://api.agnes-ai.cn/agnesapi
-    """
-    base = base_url.rstrip('/')
-    if base.endswith('/v1'):
-        base = base[:-3]
-    return base + '/agnesapi'
-
-
-def fetch_video_url_from_agnesapi(base_url, video_id, api_key):
-    """通过官方推荐端点 /agnesapi 获取视频下载 URL
-
+def download_video_by_video_id(video_id, base_url, headers, subdir, prefix):
+    """通过 video_id 使用 /agnesapi 端点下载视频
+    
     Args:
-        base_url: API Base URL（如 https://api.agnes-ai.cn/v1）
-        video_id: 创建任务时返回的 video_id
-        api_key: API Key
-
+        video_id: 视频 ID
+        base_url: API Base URL
+        headers: 请求头
+        subdir: 保存子目录
+        prefix: 文件名前缀
+    
     Returns:
-        视频 URL 字符串，失败返回空字符串
+        保存后的文件名，失败返回 None
     """
-    if not video_id:
-        return ''
     try:
-        url = f"{build_agnesapi_url(base_url)}?video_id={video_id}"
-        headers = {'Authorization': f'Bearer {api_key}'}
-        print(f"[视频URL] 通过 agnesapi 端点获取: {url[:120]}...")
-        resp = requests.get(url, headers=headers, timeout=30)
+        print(f"[视频下载] 通过 video_id 获取视频: {video_id[:50]}...")
+        # 尝试新端点 /agnesapi?video_id=<VIDEO_ID>
+        agnesapi_url = f'{base_url}/agnesapi'
+        resp = requests.get(agnesapi_url, headers=headers, params={'video_id': video_id}, timeout=(30, 120), stream=True)
+        
         if resp.status_code == 200:
-            data = resp.json()
-            video_url = (
-                data.get('url')
-                or data.get('video_url')
-                or data.get('output_url')
-                or ''
-            )
-            if not video_url and isinstance(data.get('metadata'), dict):
-                meta = data['metadata']
-                video_url = meta.get('url', '') or meta.get('video_url', '') or meta.get('output_url', '')
-            if video_url:
-                print(f"[视频URL] agnesapi 端点获取成功: {video_url[:150]}")
-            else:
-                print(f"[视频URL] agnesapi 端点响应中未找到 url 字段: {json.dumps(data, ensure_ascii=False)[:300]}")
-            return video_url
+            content_type = resp.headers.get('Content-Type', '')
+            # 如果返回的是直接的视频流
+            if 'video' in content_type or 'octet-stream' in content_type:
+                return _save_stream_to_file(resp, subdir, prefix)
+            # 如果返回的是 JSON（包含下载 URL）
+            try:
+                data = resp.json()
+                url = (data.get('url', '') or data.get('video_url', '') or 
+                       data.get('video', '') or data.get('output_url', ''))
+                if isinstance(data.get('data'), dict):
+                    url = url or data['data'].get('url', '') or data['data'].get('video_url', '')
+                if url:
+                    print(f"[视频下载] agnesapi 返回 URL: {url[:150]}...")
+                    return download_and_save_file(url, subdir, prefix, 'mp4')
+                # 可能 data 本身就是视频数据（base64）
+                if data.get('data') and isinstance(data['data'], str) and len(data['data']) > 1000:
+                    import base64
+                    app_dir = get_app_dir()
+                    target_dir = os.path.join(app_dir, subdir)
+                    os.makedirs(target_dir, exist_ok=True)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    short_uuid = uuid.uuid4().hex[:8]
+                    filename = f"{prefix}_{timestamp}_{short_uuid}.mp4"
+                    filepath = os.path.join(target_dir, filename)
+                    with open(filepath, 'wb') as f:
+                        f.write(base64.b64decode(data['data']))
+                    file_size = os.path.getsize(filepath)
+                    if file_size > 1000:
+                        print(f"[保存成功] {subdir}/{filename} ({file_size // 1024}KB)")
+                        return filename
+            except (json.JSONDecodeError, ValueError):
+                pass
         else:
-            print(f"[视频URL] agnesapi 端点响应异常: HTTP {resp.status_code}: {resp.text[:200]}")
+            print(f"[视频下载] agnesapi 端点返回 {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
-        print(f"[视频URL] agnesapi 端点请求失败: {type(e).__name__}: {e}")
-    return ''
+        print(f"[视频下载] agnesapi 端点异常: {type(e).__name__}: {e}")
+    return None
+
+
+def _save_stream_to_file(resp, subdir, prefix):
+    """将流式响应保存为文件"""
+    app_dir = get_app_dir()
+    target_dir = os.path.join(app_dir, subdir)
+    os.makedirs(target_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    short_uuid = uuid.uuid4().hex[:8]
+    filename = f"{prefix}_{timestamp}_{short_uuid}.mp4"
+    filepath = os.path.join(target_dir, filename)
+    with open(filepath, 'wb') as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            f.write(chunk)
+    file_size = os.path.getsize(filepath)
+    if file_size > 1000:
+        print(f"[保存成功] {subdir}/{filename} ({file_size // 1024}KB)")
+        return filename
+    else:
+        os.remove(filepath)
+        return None
 
 
 def download_and_save_file(url, subdir, prefix, ext, max_retries=3):
@@ -191,10 +218,6 @@ def poll_video_status(task_id, api_key, model=None):
                             if not video_url and isinstance(result.get('metadata'), dict):
                                 meta = result['metadata']
                                 video_url = meta.get('video_url', '') or meta.get('url', '') or meta.get('output_url', '')
-                            # 官方推荐方式：通过 /agnesapi 端点 + video_id 获取视频 URL
-                            if not video_url:
-                                video_id = video_tasks[task_id].get('video_id', '')
-                                video_url = fetch_video_url_from_agnesapi(base_url, video_id, api_key)
                             if not video_url:
                                 try:
                                     content_resp = requests.get(f'{base_url}/videos/{task_id}/content', headers=headers, timeout=30)
@@ -214,6 +237,13 @@ def poll_video_status(task_id, api_key, model=None):
                                 local_filename = download_and_save_file(
                                     video_url, 'videos', 'video', 'mp4'
                                 )
+                            elif result.get('video_id'):
+                                # 新 API 格式：通过 video_id 下载
+                                video_id = result['video_id']
+                                print(f"[视频下载] 使用 video_id: {video_id[:50]}...")
+                                local_filename = download_video_by_video_id(
+                                    video_id, base_url, headers, 'videos', 'video'
+                                )
 
                             video_tasks[task_id]['result'] = {
                                 'video_url': video_url,
@@ -230,3 +260,55 @@ def poll_video_status(task_id, api_key, model=None):
             if shutdown_event.is_set():
                 return
             continue
+
+
+def build_agnesapi_url(base_url):
+    """根据 API Base URL 构造 agnesapi 端点 URL
+
+    agnesapi 端点在域名根路径（无 /v1 前缀）：
+    https://api.agnes-ai.cn/v1  ->  https://api.agnes-ai.cn/agnesapi
+    """
+    base = base_url.rstrip('/')
+    if base.endswith('/v1'):
+        base = base[:-3]
+    return base + '/agnesapi'
+
+def fetch_video_url_from_agnesapi(base_url, video_id, api_key):
+    """通过官方推荐端点 /agnesapi 获取视频下载 URL
+
+    Args:
+        base_url: API Base URL（如 https://api.agnes-ai.cn/v1）
+        video_id: 创建任务时返回的 video_id
+        api_key: API Key
+
+    Returns:
+        视频 URL 字符串，失败返回空字符串
+    """
+    if not video_id:
+        return ''
+    try:
+        url = f"{build_agnesapi_url(base_url)}?video_id={video_id}"
+        headers = {'Authorization': f'Bearer {api_key}'}
+        print(f"[视频URL] 通过 agnesapi 端点获取: {url[:120]}...")
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            video_url = (
+                data.get('url')
+                or data.get('video_url')
+                or data.get('output_url')
+                or ''
+            )
+            if not video_url and isinstance(data.get('metadata'), dict):
+                meta = data['metadata']
+                video_url = meta.get('url', '') or meta.get('video_url', '') or meta.get('output_url', '')
+            if video_url:
+                print(f"[视频URL] agnesapi 端点获取成功: {video_url[:150]}")
+            else:
+                print(f"[视频URL] agnesapi 端点响应中未找到 url 字段: {json.dumps(data, ensure_ascii=False)[:300]}")
+            return video_url
+        else:
+            print(f"[视频URL] agnesapi 端点响应异常: HTTP {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        print(f"[视频URL] agnesapi 端点请求失败: {type(e).__name__}: {e}")
+    return ''

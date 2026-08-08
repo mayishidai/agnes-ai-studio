@@ -9,6 +9,19 @@ import sys
 import threading
 import webbrowser
 
+# 禁用 Windows 控制台快速编辑模式（防止点击控制台窗口导致程序卡住）
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        mode = ctypes.c_ulong()
+        kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+        # 清除 ENABLE_QUICK_EDIT_MODE (0x0040)，保留 ENABLE_EXTENDED_FLAGS (0x0080)
+        kernel32.SetConsoleMode(handle, (mode.value & ~0x0040) | 0x0080)
+    except Exception:
+        pass  # 非控制台环境（如服务）忽略
+
 from src import create_app
 from src.config import get_config_path, shutdown_event
 

@@ -401,21 +401,31 @@ def sanitize_image_prompt(prompt):
 
 
 def build_video_prompt(shot, shot_assets):
-    """根据分镜和参考素材构建视频生成 prompt（强调角色外观一致性）"""
+    """根据分镜和参考素材构建视频生成 prompt（强调角色外观一致性）
+    
+    Returns:
+        (english_prompt, chinese_prompt) 元组
+    """
     base_prompt = shot.get('prompt_en', '') or shot.get('scene_desc', '')
+    scene_desc_cn = shot.get('scene_desc', '')
     
     # 【重要】禁止视频模型生成任何文字/字幕，中文字幕由 ffmpeg 后期烧录
-    prompt = "No text, no subtitles, no captions, no labels, no written words, no letters, no signs, no watermarks, no typography, no writing of any kind should appear anywhere in the video. Pure cinematic scene only. "
-    prompt += base_prompt
+    en_prompt = "No text, no subtitles, no captions, no labels, no written words, no letters, no signs, no watermarks, no typography, no writing of any kind should appear anywhere in the video. Pure cinematic scene only. "
+    en_prompt += base_prompt
     
-    # 不再将对话加入 prompt（对话由 ffmpeg 后期烧录中文字幕）
+    # 中文提示词（供前端展示）
+    cn_prompt = scene_desc_cn or base_prompt
     
     if shot_assets:
         char_descs = []
         scene_descs = []
         prop_descs = []
+        char_descs_cn = []
+        scene_descs_cn = []
+        prop_descs_cn = []
         for a in shot_assets:
             desc = a.get('desc', '')
+            desc_cn = a.get('desc_cn', '') or a.get('desc', '')
             if not desc:
                 continue
             for term in ['three views', 'three-view', 'character design sheet', 'design board',
@@ -429,22 +439,74 @@ def build_video_prompt(shot, shot_assets):
             name = a.get('name', '')
             if cat == 'characters':
                 char_descs.append(f"{name}: {desc}")
+                char_descs_cn.append(f"{name}: {desc_cn}")
+                # 【面部一致性】强调面部特征
+                en_prompt += f" CRUCIAL: The character {name}'s facial features (face shape, eye shape, nose, mouth, skin tone, hair style and color) in the video MUST exactly match the reference image. Do NOT alter or reimagine the character's face."
             elif cat == 'scenes':
                 scene_descs.append(desc)
+                scene_descs_cn.append(desc_cn)
             elif cat == 'props':
                 prop_descs.append(desc)
+                prop_descs_cn.append(desc_cn)
         
         consistency_parts = []
+        consistency_parts_cn = []
         if char_descs:
-            consistency_parts.append("Character appearance (MUST match exactly): " + "; ".join(char_descs))
+            consistency_parts.append("Character appearance (MUST match exactly, especially facial features): " + "; ".join(char_descs))
+            consistency_parts_cn.append("角色外观(必须严格一致，尤其是面部特征): " + "; ".join(char_descs_cn))
         if prop_descs:
             consistency_parts.append("Props: " + "; ".join(prop_descs))
+            consistency_parts_cn.append("道具: " + "; ".join(prop_descs_cn))
         if scene_descs:
             consistency_parts.append("Scene: " + "; ".join(scene_descs))
+            consistency_parts_cn.append("场景: " + "; ".join(scene_descs_cn))
         
         if consistency_parts:
-            prompt = f"{prompt}. {' | '.join(consistency_parts)}. Use reference images ONLY for character appearance consistency, NOT as the starting frame."
+            en_prompt = f"{en_prompt}. {' | '.join(consistency_parts)}. Use reference images ONLY for character appearance consistency, NOT as the starting frame."
+            cn_prompt = f"{cn_prompt}. {' | '.join(consistency_parts_cn)}"
     
-    prompt = f"{prompt}. The video MUST begin directly with the described natural cinematic scene. Never show any design sheet, character layout, three-view orthographic, or reference board in the video. Start immediately with the actual story scene."
-    prompt = sanitize_video_prompt(prompt)
-    return prompt
+    en_prompt = f"{en_prompt}. The video MUST begin directly with the described natural cinematic scene. Never show any design sheet, character layout, three-view orthographic, or reference board in the video. Start immediately with the actual story scene."
+    en_prompt = sanitize_video_prompt(en_prompt)
+    
+    return en_prompt, cn_prompt
+
+
+def is_mostly_chinese(text):
+    """检测文本是否主要为中文"""
+    if not text:
+        return False
+    chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    return chinese_chars > len(text) * 0.3
+
+
+def translate_cn_to_en(text, api_key, model=None):
+    """将中文提示词翻译为英文（用于发送给视频模型）"""
+    if not text or not is_mostly_chinese(text):
+        return text  # 已经是英文，直接返回
+    try:
+        from ..config import get_vendor_api_key, get_vendor_base_url
+        from ..models import DEFAULT_TEXT_MODEL
+        model = model or DEFAULT_TEXT_MODEL
+        base_url = get_vendor_base_url(model)
+        key = api_key or get_vendor_api_key(model)
+        headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
+        payload = {
+            'model': model,
+            'messages': [
+                {'role': 'system', 'content': 'You are a professional translator. Translate the following Chinese video scene description into English. Keep it vivid and cinematic. Output ONLY the English translation, nothing else.'},
+                {'role': 'user', 'content': text}
+            ],
+            'max_tokens': 1024,
+            'temperature': 0.3
+        }
+        import requests
+        resp = requests.post(f'{base_url}/chat/completions', headers=headers, json=payload, timeout=60)
+        if resp.status_code == 200:
+            result = resp.json()
+            translated = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+            if translated:
+                print(f"[翻译] 中文→英文: {text[:50]}... → {translated[:50]}...")
+                return translated
+    except Exception as e:
+        print(f"[翻译] 翻译失败，使用原文: {e}")
+    return text

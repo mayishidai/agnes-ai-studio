@@ -54,15 +54,13 @@ def api_config():
             val = data.get(key_field, '').strip()
             if val:
                 config[key_field] = val
-            elif key_field in data:
-                config.pop(key_field, None)
+            # 空值时保留已有配置，不删除
         
         for url_field in vendor_urls:
             val = data.get(url_field, '').strip()
             if val:
                 config[url_field] = val
-            elif url_field in data:
-                config.pop(url_field, None)
+            # 空值时保留已有配置，不删除
         
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f)
