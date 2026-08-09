@@ -2599,7 +2599,7 @@
                         const retryBtn = isFailed ? `<button style="font-size:11px;color:#fff;background:var(--error);border:none;border-radius:4px;padding:2px 8px;cursor:pointer;" onclick="regenerateAssetImage(${idx})" id="asset-retry-${idx}">重新生成</button>` : '';
                         let imgHtml;
                         if (hasImage) {
-                            imgHtml = `<img src="${imgSrc}" style="width:100%;height:160px;object-fit:cover;" alt="${a.name}" id="asset-img-${idx}">`;
+                            imgHtml = `<img src="${imgSrc}" style="width:100%;height:160px;object-fit:cover;cursor:pointer;" alt="${a.name}" id="asset-img-${idx}" onclick="openLightbox('${imgSrc}')">`;
                         } else if (isGenerating) {
                             imgHtml = `<div style="height:160px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:12px;" id="asset-img-${idx}"><span class="loading-spinner" style="margin-right:6px;"></span>生成中...</div>`;
                         } else {
@@ -2779,6 +2779,37 @@
                 console.error('Drama poll error:', e);
             }
         }
+        // ========== Lightbox 图片放大查看（合并 V7 时丢失，已恢复）==========
+        function openLightbox(imgSrc) {
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightboxImg');
+            lightboxImg.src = imgSrc;
+            lightbox.style.display = 'flex';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        // 点击遮罩关闭 lightbox
+        document.addEventListener('click', function(e) {
+            const lightbox = document.getElementById('lightbox');
+            if (e.target === lightbox) {
+                closeLightbox();
+            }
+        });
+
+        // ESC 键关闭 lightbox
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        });
+
     </script>
+    <!-- Lightbox 图片放大查看遮罩（合并 V7 时丢失，已恢复） -->
+    <div id="lightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; justify-content:center; align-items:center; cursor:pointer;">
+        <img id="lightboxImg" style="max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.5);" />
+    </div>
 </body>
 </html>
