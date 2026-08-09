@@ -15,7 +15,7 @@ from ..config import (
     get_custom_models_by_type
 )
 from ..models import (
-    drama_tasks, drama_lock, ensure_drama_dirs,
+    drama_tasks, drama_lock, ensure_drama_dirs, save_drama_task,
     TEXT_MODEL_OPTIONS, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS,
     DEFAULT_TEXT_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL
 )
@@ -113,11 +113,13 @@ drama_merge_pause_events = {}
 drama_story_edit_events = {}
 # 素材重生成跟踪：drama_id -> {asset_index: threading.Event}
 drama_asset_regen_events = {}
+# 取消事件：每个短剧任务一个，用于用户主动取消流水线（合并 V7 时丢失，已恢复）
+drama_cancel_events = {}
 
 
 # ==================== 短剧流水线 ====================
 
-def drama_pipeline(drama_id, api_key, text_api_key=None):
+def drama_pipeline(drama_id, api_key, text_api_key=None, cancel_event=None):
     """短剧生成 5 步流水线（后台线程执行）"""
     if text_api_key is None:
         text_api_key = api_key
@@ -130,6 +132,14 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
     def _is_shutdown():
         return shutdown_event.is_set()
 
+    def _is_cancelled():
+        """检查是否被用户取消或系统关闭（合并 V7 时丢失，已恢复）"""
+        if shutdown_event.is_set():
+            return True
+        if cancel_event and cancel_event.is_set():
+            return True
+        return False
+
     try:
         text_model = drama_tasks[drama_id].get('text_model', DEFAULT_TEXT_MODEL)
 
@@ -137,6 +147,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
         print(f"[短剧 {drama_id}] Step 1a: 生成故事梗概...")
         _update(status='step1', step='step1', message='①a 正在创作故事梗概...')
         if _is_shutdown(): return
+        if _is_cancelled(): return
 
         try:
             story_text = call_text_model(
@@ -174,11 +185,13 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 else:
                     print(f"[短剧 {drama_id}] 用户确认故事，继续生成剧本")
         if _is_shutdown(): return
+        if _is_cancelled(): return
 
         # ---- Step 1b: 生成专业剧本 ----
         print(f"[短剧 {drama_id}] Step 1b: 生成专业剧本...")
         _update(message='①b 正在将故事改编为拍摄剧本...')
         if _is_shutdown(): return
+        if _is_cancelled(): return
 
         try:
             script_text = call_text_model(
@@ -196,6 +209,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
 
         # ---- Step 2: 生成分镜 ----
         if _is_shutdown(): return
+        if _is_cancelled(): return
         print(f"[短剧 {drama_id}] Step 2: 生成分镜...")
         _update(status='step2', step='step2', message='正在生成分镜脚本...')
 
@@ -218,6 +232,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
 
         # ---- Step 3: 提取素材 + 生成参考图 ----
         if _is_shutdown(): return
+        if _is_cancelled(): return
         print(f"[短剧 {drama_id}] Step 3: 提取素材并生成参考图...")
         _update(status='step3', step='step3', message='正在提取角色/场景/道具特征...')
 
@@ -252,6 +267,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
         img_fail = 0
         for idx, asset in enumerate(all_assets):
             if _is_shutdown(): return
+            if _is_cancelled(): return
             category = asset.get('category', 'characters')
             cat_label = {'characters': '角色', 'scenes': '场景', 'props': '道具'}.get(category, '素材')
             _update(message=f'生成{cat_label}图 ({idx+1}/{len(all_assets)}): {asset["name"]}...')
@@ -380,6 +396,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 print(f"[短剧 {drama_id}] 等待超时（2分钟），自动继续 Step 4...")
                 _update(message='确认超时，自动继续生成视频...')
         if _is_shutdown(): return
+        if _is_cancelled(): return
 
         # ---- 等待所有进行中的素材重生成完成 ----
         regen_events = drama_asset_regen_events.get(drama_id, {})
@@ -393,9 +410,11 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 _update(message='素材重生成完成，开始生成视频...')
                 print(f"[短剧 {drama_id}] 所有素材重生成已完成，继续 Step 4")
         if _is_shutdown(): return
+        if _is_cancelled(): return
 
         # ---- Step 4: 逐镜头生成视频 ----
         if _is_shutdown(): return
+        if _is_cancelled(): return
         print(f"[短剧 {drama_id}] Step 4: 逐镜头生成视频...")
         _update(status='step4', step='step4', message='开始逐镜头生成视频...')
 
@@ -406,6 +425,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
 
         for shot_idx, shot in enumerate(shots):
             if _is_shutdown(): return
+            if _is_cancelled(): return
             _update(message=f'生成视频 ({shot_idx+1}/{len(shots)}): 分镜 {shot.get("shot_index", shot_idx+1)}...')
 
             shot_chars = [c.lower().strip() for c in shot.get('characters', [])]
@@ -517,6 +537,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 print(f"[短剧 {drama_id}] 镜头 {shot_idx+1} 开始轮询，task_id={vtask_id}")
                 for poll_i in range(120):
                     if _is_shutdown(): return
+                    if _is_cancelled(): return
                     if shutdown_event.wait(timeout=10):
                         return
                     try:
@@ -691,6 +712,7 @@ def drama_pipeline(drama_id, api_key, text_api_key=None):
                 print(f"[短剧 {drama_id}] 合并确认超时(5分钟)，自动开始合并")
                 _update(message='确认超时，自动开始合并...')
         if _is_shutdown(): return
+        if _is_cancelled(): return
         
         # 检查是否需要等待重试失败的镜头
         with drama_lock:
@@ -779,8 +801,9 @@ def drama_start():
         drama_merge_pause_events[drama_id] = threading.Event()
         drama_story_edit_events[drama_id] = threading.Event()
         drama_asset_regen_events[drama_id] = {}
+        drama_cancel_events[drama_id] = threading.Event()
 
-    thread = threading.Thread(target=drama_pipeline, args=(drama_id, api_key, text_api_key), daemon=True)
+    thread = threading.Thread(target=drama_pipeline, args=(drama_id, api_key, text_api_key, drama_cancel_events[drama_id]), daemon=True)
     thread.start()
 
     return jsonify({'success': True, 'drama_id': drama_id, 'status': 'pending'})
@@ -983,6 +1006,35 @@ def drama_list():
                 'created_at': d['created_at']
             })
         return jsonify({'success': True, 'dramas': items})
+
+
+@drama_bp.route('/api/drama/cancel', methods=['POST'])
+def drama_cancel():
+    """取消短剧生成流水线（合并 V7 时丢失，已从本地 0da6f7e 恢复）"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        if drama.get('status') in ('completed', 'failed', 'cancelled'):
+            return jsonify({'success': False, 'error': '任务已结束，无法取消'}), 400
+
+    # 设置取消事件
+    cancel_event = drama_cancel_events.get(drama_id)
+    if cancel_event:
+        cancel_event.set()
+
+    with drama_lock:
+        drama['status'] = 'cancelled'
+        drama['message'] = '已取消'
+    save_drama_task(drama_id)
+
+    print(f"[短剧 {drama_id}] 用户取消流水线")
+    return jsonify({'success': True, 'message': '已取消'})
 
 
 @drama_bp.route('/api/drama/optimize-prompt', methods=['POST'])

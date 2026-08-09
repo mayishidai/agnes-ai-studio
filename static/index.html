@@ -806,6 +806,9 @@
                 <button class="btn btn-primary" id="btnStartDrama" onclick="startDrama()">
                     🎭 开始生成短剧
                 </button>
+                <button class="btn btn-danger" id="btnCancelDrama" onclick="cancelDrama()" style="display:none;background:var(--error);border-color:var(--error);">
+                    ✕ 取消生成
+                </button>
 
                 <!-- 短剧进度 -->
                 <div id="dramaProgress" style="display:none;margin-top:20px;">
@@ -827,7 +830,10 @@
                 <!-- 故事结果 -->
                 <div id="dramaStorySection" style="display:none;margin-top:16px;">
                     <div class="card" style="background:var(--surface2);">
-                        <div class="card-header">📖 故事梗概</div>
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📖 故事梗概</span>
+                            <button class="btn btn-sm" id="btnOptimizeStory" onclick="optimizeStoryPrompt()" style="font-size:11px;padding:3px 10px;">✨ AI优化</button>
+                        </div>
                         <pre id="dramaStoryContent" style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.7;max-height:250px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);"></pre>
                         <!-- 故事编辑区（仅在 paused_story 状态显示） -->
                         <div id="dramaStoryEditPanel" style="display:none;margin-top:10px;">
@@ -855,7 +861,10 @@
                 <!-- 剧本结果 -->
                 <div id="dramaScriptSection" style="display:none;margin-top:16px;">
                     <div class="card" style="background:var(--surface2);">
-                        <div class="card-header">📝 剧本</div>
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📝 剧本</span>
+                            <button class="btn btn-sm" id="btnOptimizeScript" onclick="optimizeScriptPrompt()" style="font-size:11px;padding:3px 10px;">✨ AI优化</button>
+                        </div>
                         <pre id="dramaScriptContent" style="font-size:12px;color:var(--text);white-space:pre-wrap;max-height:400px;overflow-y:auto;background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);"></pre>
                     </div>
                 </div>
@@ -2293,6 +2302,28 @@
             }
         }
 
+        // ========== 取消短剧生成（合并 V7 时丢失，已恢复）==========
+        async function cancelDrama() {
+            if (!currentDramaId) return;
+            if (!confirm('确定要取消当前短剧生成吗？')) return;
+            try {
+                const resp = await fetch('/api/drama/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已取消', 'success');
+                    document.getElementById('btnCancelDrama').style.display = 'none';
+                } else {
+                    showToast(data.error || '取消失败', 'error');
+                }
+            } catch (e) {
+                showToast('取消失败: ' + e.message, 'error');
+            }
+        }
+
         async function startDrama() {
             const prompt = document.getElementById('dramaPrompt').value.trim();
             if (!prompt) { showToast('请输入短剧描述', 'error'); return; }
@@ -2332,6 +2363,7 @@
                     currentDramaId = data.drama_id;
                     localStorage.setItem('currentDramaId', currentDramaId);
                     showToast('短剧流水线已启动！', 'success');
+                    document.getElementById('btnCancelDrama').style.display = 'inline-block';
                     startDramaPolling();
                 } else {
                     showToast(data.error || '启动失败', 'error');
@@ -2506,6 +2538,48 @@
             optimizePromptGeneric('dramaPrompt', 'btnOptimizePrompt', '请先输入短剧描述', '提示词已优化');
         }
 
+        // ========== 分步 AI 优化提示词（合并 V7 时丢失，已恢复）==========
+        async function optimizeStoryPrompt() {
+            optimizePromptGeneric('dramaStoryContent', 'btnOptimizeStory', '故事内容为空', '故事提示词已优化');
+        }
+
+        async function optimizeScriptPrompt() {
+            optimizePromptGeneric('dramaScriptContent', 'btnOptimizeScript', '剧本内容为空', '剧本提示词已优化');
+        }
+
+        async function optimizeShotPrompt(idx) {
+            const promptEl = document.getElementById(`shot-prompt-${idx}`);
+            const prompt = promptEl.value.trim();
+            if (!prompt) { showToast('提示词为空', 'error'); return; }
+            const btn = document.getElementById(`btn-optimize-shot-${idx}`);
+            btn.disabled = true;
+            btn.textContent = '优化中...';
+            try {
+                const textModel = document.getElementById('dramaTextModel').value;
+                const resp = await fetch('/api/drama/optimize-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, text_model: textModel })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    promptEl.value = data.optimized_prompt;
+                    showToast('分镜提示词已优化', 'success');
+                } else {
+                    showToast(data.error || '优化失败', 'error');
+                }
+            } catch (e) {
+                showToast('优化失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✨ 优化提示词';
+            }
+        }
+
+        async function optimizeAssetPrompt(idx) {
+            optimizePromptGeneric(`asset-prompt-${idx}`, `btn-optimize-asset-${idx}`, '提示词为空', '素材提示词已优化');
+        }
+
         async function pollDramaStatus() {
             if (!currentDramaId) return;
             try {
@@ -2557,6 +2631,10 @@
                 };
                 document.getElementById('dramaStepBadge').textContent = stepLabels[data.status] || data.status;
                 document.getElementById('dramaMessage').textContent = data.message || '';
+                // 终态时隐藏取消按钮（合并 V7 时丢失，已恢复）
+                if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+                    document.getElementById('btnCancelDrama').style.display = 'none';
+                }
 
                 // 显示故事
                 if (data.story) {
@@ -2621,7 +2699,10 @@
                                         <button onclick="toggleAssetPrompt(${idx})" style="font-size:10px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:3px;padding:1px 6px;cursor:pointer;">📝 提示词</button>
                                         <div id="asset-prompt-area-${idx}" style="display:none;margin-top:4px;">
                                             <textarea id="asset-prompt-${idx}" style="width:100%;height:80px;font-size:10px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;">${imgPrompt}</textarea>
-                                            <button onclick="regenerateWithPrompt(${idx})" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;margin-top:3px;">✏️ 修改并重新生成</button>
+                                            <div style="display:flex;gap:4px;margin-top:3px;">
+                                                <button onclick="optimizeAssetPrompt(${idx})" id="btn-optimize-asset-${idx}" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;">✨ 优化</button>
+                                                <button onclick="regenerateWithPrompt(${idx})" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;">✏️ 修改并重新生成</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2695,7 +2776,10 @@
                                     <div style="font-size:10px;font-weight:600;cursor:pointer;" onclick="toggleShotPrompt(${si})">📝 提示词 <span style="color:var(--text2);font-weight:400;">(展开/收起)</span></div>
                                     <div id="shot-prompt-area-${si}" style="display:none;margin-top:3px;">
                                         <textarea id="shot-prompt-${si}" style="width:100%;height:80px;font-size:10px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;">${videoPrompt}</textarea>
-                                        <button style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;margin-top:3px;" onclick="regenerateShotWithPrompt(${si})">✏️ 用修改后的提示词重新生成</button>
+                                        <div style="display:flex;gap:4px;margin-top:3px;">
+                                            <button class="btn btn-sm" onclick="optimizeShotPrompt(${si})" id="btn-optimize-shot-${si}" style="font-size:10px;padding:2px 8px;">✨ 优化提示词</button>
+                                            <button style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;" onclick="regenerateShotWithPrompt(${si})">✏️ 用修改后的提示词重新生成</button>
+                                        </div>
                                     </div>
                                     <div id="shot-prompt-preview-${si}" style="font-size:10px;color:var(--accent);font-family:monospace;margin-top:2px;word-break:break-all;">${promptPreview}</div>
                                 </div>
