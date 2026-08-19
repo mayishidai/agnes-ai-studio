@@ -17,10 +17,20 @@ def get_base_path():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def get_config_path():
-    """获取配置文件路径（保存在 exe 同级目录，而非临时目录）"""
+    """获取配置文件路径（保存在 exe 同级目录，而非临时目录）
+
+    飞牛 fnOS 部署时，配置目录通过数据 share 挂载在 /app/config，
+    需写入 /app/config/config.json 才能跨容器重建持久化；
+    此处优先使用持久化子目录，并兼容旧的 /app/config.json 写法。
+    """
     if getattr(sys, 'frozen', False):
         return os.path.join(os.path.dirname(sys.executable), 'config.json')
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.json')
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    persisted = os.path.join(base, 'config', 'config.json')
+    legacy = os.path.join(base, 'config.json')
+    if os.path.exists(persisted) or not os.path.exists(legacy):
+        return persisted
+    return legacy
 
 # ==================== 路径工具 ====================
 
