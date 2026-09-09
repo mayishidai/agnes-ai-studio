@@ -5,7 +5,8 @@ API 配置路由
 import os
 import json
 from flask import Blueprint, request, jsonify
-from ..config import get_config_path, get_custom_models, add_custom_model, remove_custom_model, get_custom_model_config
+from ..config import (get_config_path, get_custom_models, add_custom_model, remove_custom_model, 
+                       get_custom_model_config, get_ollama_config, save_ollama_config, get_ollama_models)
 
 config_bp = Blueprint('config', __name__)
 
@@ -120,3 +121,49 @@ def delete_custom_model():
     
     remove_custom_model(model_id)
     return jsonify({'success': True, 'message': '已删除'})
+
+
+# ==================== Ollama 本地模型配置 ====================
+
+@config_bp.route('/api/ollama/config', methods=['GET'])
+def get_ollama_config_api():
+    """获取 Ollama 配置"""
+    config = get_ollama_config()
+    return jsonify({'success': True, 'config': config})
+
+
+@config_bp.route('/api/ollama/config', methods=['POST'])
+def save_ollama_config_api():
+    """保存 Ollama 配置"""
+    data = request.get_json()
+    config = {
+        'enabled': data.get('enabled', False),
+        'base_url': data.get('base_url', 'http://localhost:11434').strip().rstrip('/'),
+        'models': data.get('models', [])
+    }
+    save_ollama_config(config)
+    return jsonify({'success': True, 'message': 'Ollama 配置已保存'})
+
+
+@config_bp.route('/api/ollama/detect', methods=['POST'])
+def detect_ollama_api():
+    """检测 Ollama 服务并获取可用模型列表"""
+    data = request.get_json() or {}
+    base_url = data.get('base_url', 'http://localhost:11434').strip().rstrip('/')
+    
+    import requests as req
+    try:
+        # 先检测服务是否可用
+        resp = req.get(f'{base_url}/api/tags', timeout=5)
+        if resp.status_code == 200:
+            models_data = resp.json()
+            models = [m['name'] for m in models_data.get('models', [])]
+            return jsonify({'success': True, 'models': models, 'base_url': base_url})
+        else:
+            return jsonify({'success': False, 'error': f'Ollama 返回状态码 {resp.status_code}'}), 502
+    except req.exceptions.ConnectionError:
+        return jsonify({'success': False, 'error': f'无法连接到 Ollama ({base_url})，请确认 Ollama 已启动'}), 503
+    except req.exceptions.Timeout:
+        return jsonify({'success': False, 'error': '连接 Ollama 超时'}), 504
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'检测失败: {e}'}), 500

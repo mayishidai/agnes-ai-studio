@@ -524,6 +524,7 @@
             <button class="tab" onclick="switchTab('video')">🎬 视频生成</button>
             <button class="tab" onclick="switchTab('videoTasks')">📋 视频任务</button>
             <button class="tab" onclick="switchTab('drama')">🎭 短剧生成</button>
+            <button class="tab" onclick="switchTab('anchor')">🎙 数字人口播</button>
             <button class="tab" onclick="switchTab('localFiles')">📁 本地文件</button>
         </div>
 
@@ -588,19 +589,33 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">参考图片</label>
+                    <label class="form-label">参考图片（支持多张）</label>
                     <div class="drop-zone" id="img2imgDropZone" onclick="document.getElementById('img2imgFileInput').click()">
                         <div class="drop-zone-icon">🖼</div>
                         <div class="drop-zone-text">拖拽图片到此处，或<strong>点击选择</strong></div>
-                        <div class="drop-zone-hint">支持 JPG / PNG / GIF / WebP</div>
-                        <input type="file" class="upload-input" id="img2imgFileInput" accept="image/*" onchange="handleDropZoneFile(this, 'img2img')">
+                        <div class="drop-zone-hint">支持 JPG / PNG / GIF / WebP，可上传多张</div>
+                        <input type="file" class="upload-input" id="img2imgFileInput" accept="image/*" multiple onchange="handleDropZoneFiles(this, 'img2img')">
                     </div>
-                    <div class="form-hint" style="margin-top:8px;">或者直接输入图片 URL：</div>
-                    <input type="text" class="form-input" id="img2imgUrl" placeholder="输入参考图片的 URL 地址..." style="margin-top:4px;">
+                    <div id="img2imgThumbs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+                    <div class="form-hint" style="margin-top:8px;">或者直接输入图片 URL（多张用逗号分隔）：</div>
+                    <input type="text" class="form-input" id="img2imgUrl" placeholder="输入参考图片 URL，多张用英文逗号分隔..." style="margin-top:4px;">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">编辑描述</label>
+                    <div style="margin-bottom:8px;">
+                        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">💡 商品宣传图模板（点击快速填入）：</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张商品图片放置在大理石台面上，背景为简约现代风格，柔和的自然光从左侧照射，营造高端质感的产品宣传图，4K高清，商业摄影风格')">🏠 家居摆件</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张化妆品产品图放置在鲜花和绿叶环绕的大理石台面上，背景为柔和的粉色渐变，光线柔和通透，营造清新自然的美妆广告风格，高清商业摄影')">💄 美妆护肤</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张食品图片放置在木质餐盘上，周围点缀新鲜食材和香料，背景为暖色调的厨房场景，自然光照射，营造食欲满满的美食宣传图，高清摄影风格')">🍽 美食餐饮</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张数码产品图片放置在简约白色桌面上，背景为科技感渐变蓝色光影，光线干净利落，营造现代科技产品宣传图风格，4K高清商业摄影')">📱 数码产品</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张服装图片展示在时尚都市街头，背景为模糊的城市建筑，阳光自然照射，营造时尚品牌宣传图风格，高清摄影')">👗 服装鞋帽</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张珠宝首饰图片放置在黑色丝绒展示台上，背景为深色奢华风格，点级光影效果，营造高端珠宝广告风格，高清微距摄影')">💎 珠宝奢侈品</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张母婴产品图片放置在温馨明亮的婴儿房场景中，周围有柔软的毛毯和可爱玩具，光线柔和温暖，营造安全温馨的宣传图风格，高清摄影')">🍼 母婴用品</button>
+                            <button class="preset-btn" style="font-size:11px;padding:4px 10px;" onclick="setImg2ImgPreset('将这张图片制作成电商主图风格，纯白背景，产品居中，四周留白均匀，光线均匀无阴影，突出产品本身细节，适合淘宝京东等电商平台使用')">🛒 电商主图</button>
+                        </div>
+                    </div>
                     <textarea class="form-textarea" id="img2imgPrompt" placeholder="描述你希望对参考图片做什么修改...&#10;例如：改成水彩画风格 / 将背景换为海边 / 变成卡通风格"></textarea>
                 </div>
 
@@ -608,10 +623,16 @@
                     <div class="form-group">
                         <label class="form-label">输出尺寸</label>
                         <select class="form-select" id="img2imgSize">
-                            <option value="1024x768">1024 × 768</option>
-                            <option value="1024x1024">1024 × 1024</option>
-                            <option value="768x1024">768 × 1024</option>
+                            <option value="1024x1024">1:1 (1024 × 1024)</option>
+                            <option value="1344x768">16:9 (1344 × 768)</option>
+                            <option value="768x1344">9:16 (768 × 1344)</option>
+                            <option value="1024x768">4:3 (1024 × 768)</option>
+                            <option value="768x1024">3:4 (768 × 1024)</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">生图模型</label>
+                        <select class="form-select" id="img2imgModel"></select>
                     </div>
                 </div>
 
@@ -624,6 +645,8 @@
                     <div class="result-actions">
                         <button class="btn btn-sm" onclick="downloadImg2Img()">📥 下载图片</button>
                         <button class="btn btn-sm" onclick="copyImg2ImgUrl()">📋 复制URL</button>
+                        <button class="btn btn-sm" id="img2imgSizeBtn" onclick="toggleImg2ImgSize()">📐 尺寸: 完整</button>
+                        <button class="btn btn-sm" style="color:var(--error);" onclick="deleteImg2Img()">🗑 删除图片</button>
                         <span style="font-size:11px;color:var(--success);margin-left:8px;display:none;" id="img2imgLocalSaved">✅ 已保存到 pictures 文件夹</span>
                     </div>
                 </div>
@@ -650,15 +673,16 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">参考图片 (可选 - 图生视频)</label>
+                    <label class="form-label">参考图片（支持多张 - 图生视频）</label>
                     <div class="drop-zone" id="videoDropZone" onclick="document.getElementById('videoFileInput').click()">
                         <div class="drop-zone-icon">🖼</div>
                         <div class="drop-zone-text">拖拽图片到此处，或<strong>点击选择</strong></div>
-                        <div class="drop-zone-hint">支持 JPG / PNG / GIF / WebP</div>
-                        <input type="file" class="upload-input" id="videoFileInput" accept="image/*" onchange="handleDropZoneFile(this, 'video')">
+                        <div class="drop-zone-hint">支持 JPG / PNG / GIF / WebP，可上传多张</div>
+                        <input type="file" class="upload-input" id="videoFileInput" accept="image/*" multiple onchange="handleDropZoneFiles(this, 'video')">
                     </div>
-                    <div class="form-hint" style="margin-top:8px;">或者直接输入图片 URL：</div>
-                    <input type="text" class="form-input" id="videoImageUrl" placeholder="留空则为纯文本生成视频，填入图片URL则为图生视频" style="margin-top:4px;">
+                    <div id="videoThumbs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+                    <div class="form-hint" style="margin-top:8px;">或者直接输入图片 URL（多张用逗号分隔）：</div>
+                    <input type="text" class="form-input" id="videoImageUrl" placeholder="留空则纯文本生成，填入URL则图生视频，多张用逗号分隔" style="margin-top:4px;">
                 </div>
 
                 <div class="form-row">
@@ -672,6 +696,8 @@
                             <option value="1152x768">1152 × 768 (默认)</option>
                             <option value="1280x720">1280 × 720 (720p)</option>
                             <option value="1920x1080">1920 × 1080 (1080p)</option>
+                            <option value="768x1344">768 × 1344 (9:16 竖屏)</option>
+                            <option value="768x1024">768 × 1024 (3:4 竖屏)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -715,6 +741,8 @@
                         <div class="result-actions" id="videoResultActions" style="display:none;">
                             <button class="btn btn-sm" id="downloadVideoBtn" onclick="downloadVideo()">📥 下载视频</button>
                             <button class="btn btn-sm" id="copyVideoUrlBtn" onclick="copyVideoUrl()">📋 复制URL</button>
+                            <button class="btn btn-sm" id="videoSizeBtn" onclick="toggleVideoSize()">📐 尺寸: 完整</button>
+                            <button class="btn btn-sm" id="deleteVideoBtn" style="color:var(--error);" onclick="deleteVideo()">🗑 删除视频</button>
                             <span style="font-size:11px;color:var(--success);margin-left:8px;display:none;" id="videoLocalSaved">✅ 已保存到 videos 文件夹</span>
                         </div>
                     </div>
@@ -795,6 +823,21 @@
                         <select class="form-select" id="dramaVideoModel"></select>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">🎨 角色风格</label>
+                        <select class="form-select" id="dramaCharacterStyle" onchange="toggleCustomCharacterStyle()">
+                            <option value="anime" selected>动漫卡通</option>
+                            <option value="realistic">写实真人</option>
+                            <option value="pixar3d">皮克斯3D</option>
+                            <option value="semi_realistic">半写实插画</option>
+                            <option value="watercolor">水彩手绘</option>
+                            <option value="ink">中国水墨</option>
+                            <option value="custom">自定义风格...</option>
+                        </select>
+                        <input type="text" class="form-input" id="dramaCustomCharacterStyle" placeholder="请输入自定义角色风格描述，例如：赛博朋克风格、复古油画风格..." style="display:none;margin-top:6px;">
+                    </div>
+                </div>
 
                 <div class="form-row">
                     <div class="form-group">
@@ -813,7 +856,10 @@
                 <!-- 短剧进度 -->
                 <div id="dramaProgress" style="display:none;margin-top:20px;">
                     <div class="card" style="background:var(--surface2);">
-                        <div class="card-header">📊 流水线进度</div>
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📊 流水线进度</span>
+                            <button id="btnStopDrama" onclick="stopDrama()" style="font-size:12px;color:#fff;background:var(--error);border:none;border-radius:4px;padding:4px 12px;cursor:pointer;display:none;">⏹ 停止生成</button>
+                        </div>
                         <div style="display:flex;gap:8px;margin-bottom:12px;">
                             <span class="task-status" id="dramaStepBadge" style="background:#172554;color:#60a5fa;">等待中</span>
                             <span style="font-size:13px;color:var(--text2);" id="dramaMessage">正在启动...</span>
@@ -889,18 +935,7 @@
                 <div id="dramaResumeSection" style="display:none;margin-top:12px;">
                     <div style="background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%);border-radius:var(--radius);padding:16px;text-align:center;">
                         <div style="font-size:14px;color:#fff;margin-bottom:12px;">⏸ 流水线已暂停 — 请检查参考图，如需替换可点击卡片上的「替换」按钮</div>
-                        <button id="dramaResumeBtn" class="btn btn-primary" style="background:#fff;color:#e67e22;font-weight:700;padding:10px 32px;" onclick="resumeDrama()">✅ 确认并继续生成视频</button>
-                    </div>
-                </div>
-
-                <!-- 合并前确认按钮 -->
-                <div id="dramaMergeConfirmSection" style="display:none;margin-top:12px;">
-                    <div style="background:linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);border-radius:var(--radius);padding:16px;text-align:center;">
-                        <div id="dramaMergeConfirmMsg" style="font-size:14px;color:#fff;margin-bottom:12px;">⏸ 部分镜头生成失败，是否等待重新生成后再合并？</div>
-                        <div style="display:flex;gap:12px;justify-content:center;">
-                            <button id="dramaMergeWaitBtn" class="btn btn-primary" style="background:#fff;color:#e74c3c;font-weight:700;padding:10px 24px;" onclick="confirmMerge(true)">⟳ 等待并重试失败镜头</button>
-                            <button id="dramaMergeNowBtn" class="btn btn-primary" style="background:rgba(255,255,255,0.2);color:#fff;font-weight:700;padding:10px 24px;border:1px solid rgba(255,255,255,0.4);" onclick="confirmMerge(false)">▶ 直接合并已成功的</button>
-                        </div>
+                        <button id="dramaResumeBtn" class="btn btn-primary" style="background:#fff;color:#e67e22;font-weight:700;padding:10px 32px;" onclick="resumeDrama()">✅ 确认参考图</button>
                     </div>
                 </div>
 
@@ -930,6 +965,141 @@
                     <div class="card" style="background:var(--surface2);">
                         <div class="card-header">🎥 生成视频</div>
                         <div id="dramaVideosContent" style="display:flex;flex-direction:column;gap:12px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 数字人口播 -->
+        <div class="tab-content" id="tab-anchor">
+            <div class="card">
+                <div class="card-header">
+                    <span class="icon">🎙</span> 数字人口播视频
+                </div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">
+                    输入文稿内容，选择模式后自动生成带 TTS 配音和字幕的口播视频。支持三种画面模式：静态形象图、视频素材、AI 生成画面。
+                </div>
+
+                <!-- 文稿输入 -->
+                <div class="form-group">
+                    <label class="form-label">📝 文稿内容</label>
+                    <textarea class="form-textarea" id="anchorScript" rows="8" style="min-height:160px;" placeholder="请输入或粘贴口播文稿内容...&#10;&#10;支持长文章，系统会自动按语义分段，每段生成配音和画面。"></textarea>
+                </div>
+
+                <!-- 模式选择 -->
+                <div class="form-group">
+                    <label class="form-label">🎬 画面模式</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;border:2px solid var(--accent);font-size:13px;" id="anchor-mode-A-label">
+                            <input type="radio" name="anchorMode" value="A" checked onchange="switchAnchorMode('A')"> A. 静态形象图
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;border:2px solid transparent;font-size:13px;" id="anchor-mode-B-label">
+                            <input type="radio" name="anchorMode" value="B" onchange="switchAnchorMode('B')"> B. 视频素材
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;border:2px solid transparent;font-size:13px;" id="anchor-mode-C-label">
+                            <input type="radio" name="anchorMode" value="C" onchange="switchAnchorMode('C')"> C. AI 生成画面
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 模式 A: 上传形象图 -->
+                <div id="anchor-mode-A-panel">
+                    <div class="form-group">
+                        <label class="form-label">🖼 上传数字人形象图片</label>
+                        <input type="file" id="anchorAvatarImage" accept="image/*" style="font-size:13px;">
+                        <div id="anchorAvatarPreview" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+
+                <!-- 模式 B: 上传视频素材 -->
+                <div id="anchor-mode-B-panel" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">🎥 上传数字人视频素材</label>
+                        <input type="file" id="anchorAvatarVideo" accept="video/*" style="font-size:13px;">
+                        <div style="font-size:11px;color:var(--text2);margin-top:4px;">支持 mp4/mov/avi 格式，视频将按每段语音时长截取或循环</div>
+                    </div>
+                </div>
+
+                <!-- 模式 C: AI 生成画面提示词 -->
+                <div id="anchor-mode-C-panel" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">✨ 画面风格提示词</label>
+                        <textarea id="anchorVideoPrompt" rows="3" placeholder="描述画面风格，例如：&#10;一位专业主播在现代化直播间中，背景为科技感蓝色光影，4K高清，商业摄影风格"></textarea>
+                    </div>
+                </div>
+
+                <!-- TTS 音色选择 -->
+                <div class="form-group">
+                    <label class="form-label">🔊 TTS 配音音色</label>
+                    <select id="anchorVoice" style="font-size:13px;padding:8px 12px;">
+                        <option value="zh-CN-XiaoxiaoNeural">晓晓（女声·温暖）</option>
+                        <option value="zh-CN-XiaoyiNeural">晓伊（女声·活泼）</option>
+                        <option value="zh-CN-YunxiNeural">云希（男声·阳光）</option>
+                        <option value="zh-CN-YunjianNeural">云健（男声·沉稳）</option>
+                        <option value="zh-CN-XiaochenNeural">晓辰（女声·知性）</option>
+                        <option value="zh-CN-XiaohanNeural">晓涵（女声·优雅）</option>
+                        <option value="zh-CN-XiaomoNeural">晓墨（女声·沉稳）</option>
+                        <option value="zh-CN-XiaoruiNeural">晓睿（女声·干练）</option>
+                        <option value="zh-CN-XiaoshuangNeural">晓双（女声·甜美）</option>
+                        <option value="zh-CN-XiaoxuanNeural">晓萱（女声·温柔）</option>
+                        <option value="zh-CN-XiaoyanNeural">晓颜（女声·清新）</option>
+                        <option value="zh-CN-YunxiaNeural">云夏（男声·少年）</option>
+                        <option value="zh-CN-YunyangNeural">云扬（男声·专业）</option>
+                        <option value="zh-CN-YunyeNeural">云野（男声·故事感）</option>
+                    </select>
+                </div>
+
+                <!-- 每段最小时长 -->
+                <div class="form-group">
+                    <label class="form-label">⏱ 每段最小时长</label>
+                    <select id="anchorMinDuration" style="font-size:13px;padding:8px 12px;">
+                        <option value="3">3 秒（短视频）</option>
+                        <option value="5" selected>5 秒（默认）</option>
+                        <option value="8">8 秒</option>
+                        <option value="10">10 秒</option>
+                        <option value="15">15 秒（长段落）</option>
+                        <option value="20">20 秒</option>
+                    </select>
+                    <div style="font-size:11px;color:var(--text2);margin-top:4px;">每段视频的最短时长，影响文稿分段粒度和视频总时长</div>
+                </div>
+
+                <!-- 模型选择 -->
+                <div class="form-group">
+                    <label class="form-label">🤖 模型选择</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                        <div>
+                            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">文本模型（文稿分段）</div>
+                            <select id="anchorTextModel" style="font-size:12px;padding:6px 8px;width:100%;"></select>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">图片模型</div>
+                            <select id="anchorImageModel" style="font-size:12px;padding:6px 8px;width:100%;"></select>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">视频模型（C 模式）</div>
+                            <select id="anchorVideoModel" style="font-size:12px;padding:6px 8px;width:100%;"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 开始按钮 -->
+                <button class="btn" id="anchorStartBtn" onclick="startAnchorGeneration()" style="width:100%;font-size:14px;padding:10px;">
+                    🎙 开始生成数字人口播视频
+                </button>
+
+                <!-- 进度展示 -->
+                <div id="anchorProgress" style="display:none;margin-top:16px;">
+                    <div class="card" style="background:var(--surface2);">
+                        <div class="card-header">📊 生成进度</div>
+                        <div id="anchorProgressContent" style="font-size:13px;"></div>
+                    </div>
+                </div>
+
+                <!-- 视频结果 -->
+                <div id="anchorResult" style="display:none;margin-top:16px;">
+                    <div class="card" style="background:var(--surface2);">
+                        <div class="card-header">🎥 生成结果</div>
+                        <div id="anchorResultContent"></div>
                     </div>
                 </div>
             </div>
@@ -979,17 +1149,34 @@
                 <label class="form-label">通义千问（DashScope） API Key</label>
                 <input type="password" class="form-input" id="qwenApiKeyInput" placeholder="DashScope API Key（可选）">
             </div>
-            <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
-            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🖼 生图模型</div>
             <div class="form-group">
                 <label class="form-label">MiniMax API Key</label>
-                <input type="password" class="form-input" id="minimaxApiKeyInput" placeholder="MiniMax API Key（可选）">
+                <input type="password" class="form-input" id="minimaxApiKeyInput" placeholder="MiniMax API Key（可选，用于 MiniMax M3 等模型）">
+            </div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🖼 生图模型</div>
+            <div class="form-hint" style="margin-bottom:8px;">
+                MiniMax 等厂商的生图模型复用上方对应厂商的 API Key
             </div>
             <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎬 生视频模型</div>
             <div class="form-hint" style="margin-bottom:8px;">
                 豆包、MiniMax、千问的生视频模型复用上方对应厂商的 API Key
             </div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🦙 Ollama 本地模型</div>
+            <div class="form-hint" style="margin-bottom:8px;">
+                使用本地部署的 Ollama 模型（无需 API Key，需先安装 <a href="https://ollama.com" target="_blank" style="color:var(--accent);">ollama.com</a>）
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                    <input type="checkbox" id="ollamaEnabled" onchange="toggleOllamaSection()">
+                    启用 Ollama
+                </label>
+                <input type="text" class="form-input" id="ollamaBaseUrl" placeholder="http://localhost:11434" style="font-size:11px;flex:1;" disabled>
+                <button class="btn btn-sm" id="ollamaDetectBtn" onclick="detectOllamaModels()" style="font-size:11px;white-space:nowrap;" disabled>🔍 检测模型</button>
+            </div>
+            <div id="ollamaModelsResult" style="font-size:11px;color:var(--text2);margin-bottom:4px;"></div>
             <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔧 自定义模型</div>
             <div class="form-hint" style="margin-bottom:8px;">
@@ -1034,11 +1221,16 @@
         // ==================== 全局状态 ====================
         let currentImageUrl = '';
         let currentImg2ImgUrl = '';
+        let currentImg2ImgLocalFile = '';  // 图生图结果本地文件名（用于删除）
         let currentVideoUrl = '';
+        let currentVideoLocalFile = '';    // 视频结果本地文件名（用于删除）
+        let videoSizeIndex = 0;            // 视频显示尺寸档位：0=100% 1=50% 2=25%
+        let img2imgSizeIndex = 0;          // 图生图显示尺寸档位：0=100% 1=50% 2=25%
         let videoPollingTimer = null;
         let currentLocalTab = 'pictures';
-        let uploadedImg2ImgUrl = '';   // 图生图上传后的本地图片 URL
-        let uploadedVideoImgUrl = '';  // 视频生成上传后的本地图片 URL
+        let uploadedImg2ImgUrls = [];   // 图生图上传后的本地图片 URL 列表
+        let uploadedVideoImgUrls = [];  // 视频生成上传后的本地图片 URL 列表
+        let _lastDramaRenderHash = '';  // 短剧轮询防重渲染
 
         // ==================== 初始化 ====================
         document.addEventListener('DOMContentLoaded', () => {
@@ -1083,6 +1275,7 @@
             document.getElementById(`tab-${name}`).classList.add('active');
             if (name === 'videoTasks') refreshTaskList();
             if (name === 'localFiles') refreshLocalFiles();
+            if (name === 'anchor') loadAnchorModels();
         }
 
         // ==================== 拖拽上传 ====================
@@ -1113,19 +1306,18 @@
                     }
                 });
 
-                // 放下
+                // 放下（支持多文件）
                 zone.addEventListener('drop', (e) => {
                     zone.classList.remove('drag-over');
                     const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        handleUploadFile(files[0], type);
+                    for (let fi = 0; fi < files.length; fi++) {
+                        handleUploadFile(files[fi], type);
                     }
                 });
             });
         }
 
         async function handleUploadFile(file, type) {
-            // 验证文件类型
             if (!file.type.startsWith('image/')) {
                 showToast('请上传图片文件', 'error');
                 return;
@@ -1135,23 +1327,17 @@
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-
-                const resp = await fetch('/api/upload/image', {
-                    method: 'POST',
-                    body: formData
-                });
+                const resp = await fetch('/api/upload/image', { method: 'POST', body: formData });
                 const data = await resp.json();
 
                 if (data.success) {
                     const fullUrl = window.location.origin + data.url;
                     if (type === 'img2img') {
-                        uploadedImg2ImgUrl = fullUrl;
-                        document.getElementById('img2imgUrl').value = fullUrl;
-                        showDropZonePreview('img2imgDropZone', data.url);
+                        uploadedImg2ImgUrls.push(fullUrl);
+                        updateMultiImageUI('img2img');
                     } else if (type === 'video') {
-                        uploadedVideoImgUrl = fullUrl;
-                        document.getElementById('videoImageUrl').value = fullUrl;
-                        showDropZonePreview('videoDropZone', data.url);
+                        uploadedVideoImgUrls.push(fullUrl);
+                        updateMultiImageUI('video');
                     }
                     showToast('图片上传成功！', 'success');
                 } else {
@@ -1164,48 +1350,38 @@
             }
         }
 
-        function handleDropZoneFile(input, type) {
+        function handleDropZoneFiles(input, type) {
             if (input.files && input.files.length > 0) {
-                handleUploadFile(input.files[0], type);
+                for (let i = 0; i < input.files.length; i++) {
+                    handleUploadFile(input.files[i], type);
+                }
             }
-            // 重置 input 以便可以重新选择同一文件
             input.value = '';
         }
 
-        function showDropZonePreview(zoneId, imageUrl) {
-            const zone = document.getElementById(zoneId);
-            zone.classList.add('has-image');
-            zone.onclick = null; // 移除点击事件
+        function updateMultiImageUI(type) {
+            const urls = type === 'img2img' ? uploadedImg2ImgUrls : uploadedVideoImgUrls;
+            const thumbsId = type === 'img2img' ? 'img2imgThumbs' : 'videoThumbs';
+            const urlInputId = type === 'img2img' ? 'img2imgUrl' : 'videoImageUrl';
+            const thumbsEl = document.getElementById(thumbsId);
+            if (!thumbsEl) return;
 
-            zone.innerHTML = `
-                <img class="drop-zone-preview" src="${imageUrl}" alt="预览">
-                <button class="drop-zone-remove" onclick="event.stopPropagation(); removeDropZoneImage('${zoneId}', '${zoneId === 'img2imgDropZone' ? 'img2img' : 'video'}')">✕</button>
-            `;
+            thumbsEl.innerHTML = urls.map((u, idx) => {
+                const localPath = u.replace(window.location.origin, '');
+                return `<div style="position:relative;display:inline-block;width:64px;height:64px;">
+                    <img src="${localPath}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
+                    <button onclick="removeMultiImage('${type}', ${idx})" style="position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:var(--error);color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;">✕</button>
+                </div>`;
+            }).join('');
+
+            // 同步 URL 输入框
+            document.getElementById(urlInputId).value = urls.join(', ');
         }
 
-        function removeDropZoneImage(zoneId, type) {
-            const zone = document.getElementById(zoneId);
-            zone.classList.remove('has-image');
-            zone.onclick = function() {
-                const inputId = type === 'img2img' ? 'img2imgFileInput' : 'videoFileInput';
-                document.getElementById(inputId).click();
-            };
-
-            zone.innerHTML = `
-                <div class="drop-zone-icon">🖼</div>
-                <div class="drop-zone-text">拖拽图片到此处，或<strong>点击选择</strong></div>
-                <div class="drop-zone-hint">支持 JPG / PNG / GIF / WebP</div>
-                <input type="file" class="upload-input" id="${type === 'img2img' ? 'img2imgFileInput' : 'videoFileInput'}" accept="image/*" onchange="handleDropZoneFile(this, '${type}')">
-            `;
-
-            // 清除对应的 URL
-            if (type === 'img2img') {
-                uploadedImg2ImgUrl = '';
-                document.getElementById('img2imgUrl').value = '';
-            } else if (type === 'video') {
-                uploadedVideoImgUrl = '';
-                document.getElementById('videoImageUrl').value = '';
-            }
+        function removeMultiImage(type, idx) {
+            const urls = type === 'img2img' ? uploadedImg2ImgUrls : uploadedVideoImgUrls;
+            urls.splice(idx, 1);
+            updateMultiImageUI(type);
         }
 
         // ==================== 关闭服务 ====================
@@ -1275,10 +1451,100 @@
                 if (data.qwen_api_key_masked) document.getElementById('qwenApiKeyInput').placeholder = `已配置: ${data.qwen_api_key_masked}`;
                 if (data.minimax_api_key_masked) document.getElementById('minimaxApiKeyInput').placeholder = `已配置: ${data.minimax_api_key_masked}`;
             }).catch(() => {});
+            // 加载 Ollama 配置
+            loadOllamaConfig();
         }
 
         function closeSettings() {
             document.getElementById('settingsModal').classList.remove('show');
+        }
+
+        // ==================== Ollama 本地模型 ====================
+        let ollamaDetectedModels = [];
+
+        async function loadOllamaConfig() {
+            try {
+                const resp = await fetch('/api/ollama/config');
+                const data = await resp.json();
+                if (data.success) {
+                    const cfg = data.config;
+                    document.getElementById('ollamaEnabled').checked = cfg.enabled || false;
+                    document.getElementById('ollamaBaseUrl').value = cfg.base_url || 'http://localhost:11434';
+                    toggleOllamaSection();
+                    if (cfg.enabled && cfg.models && cfg.models.length > 0) {
+                        ollamaDetectedModels = cfg.models;
+                        document.getElementById('ollamaModelsResult').innerHTML = 
+                            `<span style="color:var(--success);">✅ 已启用，检测到 ${cfg.models.length} 个模型: ${cfg.models.join(', ')}</span>`;
+                    }
+                }
+            } catch (e) {
+                console.error('加载 Ollama 配置失败:', e);
+            }
+        }
+
+        function toggleOllamaSection() {
+            const enabled = document.getElementById('ollamaEnabled').checked;
+            document.getElementById('ollamaBaseUrl').disabled = !enabled;
+            document.getElementById('ollamaDetectBtn').disabled = !enabled;
+            if (!enabled) {
+                document.getElementById('ollamaModelsResult').innerHTML = '';
+            }
+        }
+
+        async function detectOllamaModels() {
+            const baseUrl = document.getElementById('ollamaBaseUrl').value.trim() || 'http://localhost:11434';
+            const btn = document.getElementById('ollamaDetectBtn');
+            const resultEl = document.getElementById('ollamaModelsResult');
+            btn.disabled = true;
+            btn.textContent = '🔄 检测中...';
+            resultEl.innerHTML = '';
+            try {
+                const resp = await fetch('/api/ollama/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base_url: baseUrl })
+                });
+                const data = await resp.json();
+                if (data.success && data.models.length > 0) {
+                    ollamaDetectedModels = data.models;
+                    resultEl.innerHTML = `<span style="color:var(--success);">✅ 检测到 ${data.models.length} 个模型:</span><br>` +
+                        data.models.map(m => `<label style="display:inline-flex;align-items:center;gap:2px;margin:2px 4px;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="ollama-model-cb" value="${m}" checked> ${m}
+                        </label>`).join('');
+                } else if (data.success) {
+                    resultEl.innerHTML = '<span style="color:var(--text2);">Ollama 已连接，但未找到可用模型。请先用 `ollama pull` 下载模型</span>';
+                    ollamaDetectedModels = [];
+                } else {
+                    resultEl.innerHTML = `<span style="color:var(--error);">❗ ${data.error || '检测失败'}</span>`;
+                }
+            } catch (e) {
+                resultEl.innerHTML = `<span style="color:var(--error);">❗ 检测失败: ${e.message}</span>`;
+            }
+            btn.disabled = false;
+            btn.textContent = '🔍 检测模型';
+        }
+
+        async function saveOllamaConfig() {
+            const enabled = document.getElementById('ollamaEnabled').checked;
+            const baseUrl = document.getElementById('ollamaBaseUrl').value.trim() || 'http://localhost:11434';
+            // 收集勾选的模型
+            const checkboxes = document.querySelectorAll('.ollama-model-cb:checked');
+            const models = Array.from(checkboxes).map(cb => cb.value);
+            try {
+                const resp = await fetch('/api/ollama/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled, base_url: baseUrl, models })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('Ollama 配置已保存', 'success');
+                    // 刷新模型下拉列表
+                    if (typeof loadDramaModels === 'function') loadDramaModels();
+                }
+            } catch (e) {
+                showToast('保存 Ollama 配置失败: ' + e.message, 'error');
+            }
         }
 
         // ==================== 自定义模型管理 ====================
@@ -1372,8 +1638,9 @@
             const doubaoApiKey = document.getElementById('doubaoApiKeyInput').value.trim();
             const qwenApiKey = document.getElementById('qwenApiKeyInput').value.trim();
             const minimaxApiKey = document.getElementById('minimaxApiKeyInput').value.trim();
-            if (!apiKey && !deepseekApiKey && !doubaoApiKey && !qwenApiKey && !minimaxApiKey) {
-                showToast('请至少输入一个 API Key', 'error');
+            const ollamaEnabled = document.getElementById('ollamaEnabled').checked;
+            if (!apiKey && !deepseekApiKey && !doubaoApiKey && !qwenApiKey && !minimaxApiKey && !ollamaEnabled) {
+                showToast('请至少输入一个 API Key 或启用 Ollama', 'error');
                 return;
             }
             try {
@@ -1405,6 +1672,8 @@
                 } else {
                     showToast(data.message || '保存失败', 'error');
                 }
+                // 同时保存 Ollama 配置
+                await saveOllamaConfig();
             } catch (e) {
                 showToast('保存失败: ' + e.message, 'error');
             }
@@ -1485,15 +1754,27 @@
         }
 
         // ==================== 图生图 ====================
+        function setImg2ImgPreset(text) {
+            document.getElementById('img2imgPrompt').value = text;
+            document.getElementById('img2imgPrompt').focus();
+        }
+
         async function generateImg2Img() {
             const prompt = document.getElementById('img2imgPrompt').value.trim();
-            const imageUrl = document.getElementById('img2imgUrl').value.trim();
-            if (!prompt || !imageUrl) {
-                showToast('请输入编辑描述和图片URL', 'error');
+            // 支持多张图片：从数组和 URL 输入框合并
+            let imageUrls = [...uploadedImg2ImgUrls];
+            const urlInput = document.getElementById('img2imgUrl').value.trim();
+            if (urlInput) {
+                const extraUrls = urlInput.split(',').map(s => s.trim()).filter(s => s);
+                extraUrls.forEach(u => { if (!imageUrls.includes(u)) imageUrls.push(u); });
+            }
+            if (!prompt || imageUrls.length === 0) {
+                showToast('请输入编辑描述并至少上传一张图片', 'error');
                 return;
             }
 
             const size = document.getElementById('img2imgSize').value;
+            const model = document.getElementById('img2imgModel').value;
             const btn = document.getElementById('btnImg2Img');
 
             btn.disabled = true;
@@ -1504,12 +1785,13 @@
                 const resp = await fetch('/api/image/img2img', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, image_url: imageUrl, size })
+                    body: JSON.stringify({ prompt, image_urls: imageUrls, size, model })
                 });
                 const data = await resp.json();
 
                 if (data.success && data.image_url) {
                     currentImg2ImgUrl = data.image_url;
+                    currentImg2ImgLocalFile = data.local_file || '';
                     document.getElementById('img2imgResultImg').src = data.image_url;
                     document.getElementById('img2imgResult').classList.add('show');
                     const localSaved = document.getElementById('img2imgLocalSaved');
@@ -1550,6 +1832,43 @@
             });
         }
 
+        function toggleImg2ImgSize() {
+            // 循环切换显示尺寸：完整 -> 缩小一倍(50%) -> 缩小两倍(25%)
+            img2imgSizeIndex = (img2imgSizeIndex + 1) % 3;
+            const sizes = ['100%', '50%', '25%'];
+            const labels = ['📐 尺寸: 完整', '📐 尺寸: 1/2', '📐 尺寸: 1/4'];
+            const img = document.getElementById('img2imgResultImg');
+            img.style.maxWidth = sizes[img2imgSizeIndex];
+            document.getElementById('img2imgSizeBtn').textContent = labels[img2imgSizeIndex];
+        }
+
+        async function deleteImg2Img() {
+            if (!currentImg2ImgLocalFile) {
+                showToast('该图片未保存到本地，无法删除', 'warning');
+                return;
+            }
+            if (!confirm(`确定删除图片 ${currentImg2ImgLocalFile} 吗？删除后不可恢复。`)) return;
+            try {
+                const resp = await fetch('/api/file/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: 'pictures', filename: currentImg2ImgLocalFile })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    document.getElementById('img2imgResult').classList.remove('show');
+                    document.getElementById('img2imgResultImg').src = '';
+                    currentImg2ImgUrl = '';
+                    currentImg2ImgLocalFile = '';
+                    showToast('图片已删除', 'success');
+                } else {
+                    showToast(data.error || '删除失败', 'error');
+                }
+            } catch (e) {
+                showToast('删除请求失败: ' + e.message, 'error');
+            }
+        }
+
         // ==================== 视频生成 ====================
         async function generateVideo() {
             const prompt = document.getElementById('videoPrompt').value.trim();
@@ -1563,7 +1882,13 @@
             const height = parseInt(resolution[1]);
             const numFrames = parseInt(document.getElementById('videoFrames').value);
             const frameRate = parseInt(document.getElementById('videoFrameRate').value);
-            const imageUrl = document.getElementById('videoImageUrl').value.trim();
+            // 支持多张参考图
+            let imageUrls = [...uploadedVideoImgUrls];
+            const urlInput = document.getElementById('videoImageUrl').value.trim();
+            if (urlInput) {
+                const extraUrls = urlInput.split(',').map(s => s.trim()).filter(s => s);
+                extraUrls.forEach(u => { if (!imageUrls.includes(u)) imageUrls.push(u); });
+            }
             const negativePrompt = document.getElementById('videoNegativePrompt').value.trim();
             const model = document.getElementById('videoModelSelect').value;
 
@@ -1572,16 +1897,19 @@
             btn.innerHTML = '<span class="loading-spinner"></span> 提交中...';
 
             try {
+                const body = {
+                    prompt, model, width, height,
+                    num_frames: numFrames,
+                    frame_rate: frameRate,
+                    negative_prompt: negativePrompt || undefined
+                };
+                if (imageUrls.length > 0) {
+                    body.image_urls = imageUrls;
+                }
                 const resp = await fetch('/api/video/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        prompt, model, width, height,
-                        num_frames: numFrames,
-                        frame_rate: frameRate,
-                        image_url: imageUrl || undefined,
-                        negative_prompt: negativePrompt || undefined
-                    })
+                    body: JSON.stringify(body)
                 });
                 const data = await resp.json();
 
@@ -1595,6 +1923,28 @@
 
                     // 开始轮询
                     startVideoPolling(data.task_id);
+                } else if (resp.status === 429 || data.retry_after) {
+                    // 429 速率限制：显示倒计时提示
+                    const waitSec = data.retry_after || 60;
+                    const statusEl = document.getElementById('videoStatusText');
+                    document.getElementById('videoResult').classList.add('show');
+                    statusEl.textContent = `⏳ API 速率限制，请等待 ${waitSec} 秒后重试...`;
+                    statusEl.style.color = 'var(--warning)';
+                    btn.disabled = true;
+                    let remaining = waitSec;
+                    const countdownTimer = setInterval(() => {
+                        remaining--;
+                        if (remaining <= 0) {
+                            clearInterval(countdownTimer);
+                            btn.disabled = false;
+                            btn.innerHTML = '🎬 生成视频';
+                            statusEl.style.color = '';
+                            statusEl.textContent = '可以重新提交视频生成请求';
+                        } else {
+                            statusEl.textContent = `⏳ API 速率限制，请等待 ${remaining} 秒后重试...`;
+                        }
+                    }, 1000);
+                    showToast(data.error || 'API 速率限制，请稍后重试', 'warning');
                 } else {
                     showToast(data.error || '提交失败', 'error');
                 }
@@ -1647,6 +1997,7 @@
 
                         // 优先使用远程 URL，其次使用本地文件
                         currentVideoUrl = data.video_url;
+                        currentVideoLocalFile = data.local_file || '';
                         const localFileUrl = data.local_file ? `/videos/${data.local_file}` : null;
                         const playSrc = currentVideoUrl || localFileUrl;
 
@@ -1690,6 +2041,48 @@
         function downloadVideo() {
             if (!currentVideoUrl) return;
             window.open(currentVideoUrl, '_blank');
+        }
+
+        function toggleVideoSize() {
+            // 循环切换显示尺寸：完整 -> 缩小一倍(50%) -> 缩小两倍(25%)
+            videoSizeIndex = (videoSizeIndex + 1) % 3;
+            const sizes = ['100%', '50%', '25%'];
+            const labels = ['📐 尺寸: 完整', '📐 尺寸: 1/2', '📐 尺寸: 1/4'];
+            const player = document.getElementById('videoResultPlayer');
+            player.style.maxWidth = sizes[videoSizeIndex];
+            document.getElementById('videoSizeBtn').textContent = labels[videoSizeIndex];
+        }
+
+        async function deleteVideo() {
+            if (!currentVideoLocalFile) {
+                showToast('该视频未保存到本地，无法删除', 'warning');
+                return;
+            }
+            if (!confirm(`确定删除视频 ${currentVideoLocalFile} 吗？删除后不可恢复。`)) return;
+            try {
+                const resp = await fetch('/api/file/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: 'videos', filename: currentVideoLocalFile })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    const player = document.getElementById('videoResultPlayer');
+                    player.pause();
+                    player.removeAttribute('src');
+                    player.load();
+                    player.style.display = 'none';
+                    document.getElementById('videoResultActions').style.display = 'none';
+                    document.getElementById('videoStatusText').textContent = '视频已删除';
+                    currentVideoUrl = '';
+                    currentVideoLocalFile = '';
+                    showToast('视频已删除', 'success');
+                } else {
+                    showToast(data.error || '删除失败', 'error');
+                }
+            } catch (e) {
+                showToast('删除请求失败: ' + e.message, 'error');
+            }
         }
 
         function copyVideoUrl() {
@@ -1827,6 +2220,7 @@
                 // 填充独立生图/视频模型选择器
                 fillSelect('imageModel', data.image_models, data.defaults.image_model);
                 fillSelect('videoModelSelect', data.video_models, data.defaults.video_model);
+                fillSelect('img2imgModel', data.image_models, data.defaults.image_model);
             } catch (e) {
                 console.error('Failed to load drama models:', e);
             }
@@ -1845,20 +2239,22 @@
                 const data = await resp.json();
                 if (data.success) {
                     document.getElementById('dramaResumeSection').style.display = 'none';
-                    showToast('已确认，开始生成视频...', 'success');
+                    showToast('已确认参考图，请检查分镜提示词后启动视频生成', 'success');
                 } else {
                     showToast('恢复失败: ' + (data.error || ''), 'error');
                     btn.disabled = false;
-                    btn.textContent = '✅ 确认并继续生成视频';
+                    btn.textContent = '✅ 确认参考图';
                 }
             } catch (e) {
                 showToast('恢复失败: ' + e.message, 'error');
                 btn.disabled = false;
-                btn.textContent = '✅ 确认并继续生成视频';
+                btn.textContent = '✅ 确认参考图';
             }
         }
 
         // ========== 故事编辑功能 ==========
+        let storyConfirmed = false;  // 用户已确认故事，防止轮询重新显示确认弹窗
+
         function showStoryEdit() {
             const storyContent = document.getElementById('dramaStoryContent').textContent;
             const editArea = document.getElementById('dramaStoryEditArea');
@@ -1895,6 +2291,7 @@
                 });
                 const data = await resp.json();
                 if (data.success) {
+                    storyConfirmed = true;  // 标记已确认，防止轮询重新显示
                     document.getElementById('dramaStoryConfirmSection').style.display = 'none';
                     document.getElementById('dramaStoryEditPanel').style.display = 'none';
                     // 如果编辑了，更新显示的故事内容
@@ -1911,37 +2308,6 @@
                 showToast('确认失败: ' + e.message, 'error');
                 if (directBtn) directBtn.disabled = false;
                 if (confirmBtn) confirmBtn.disabled = false;
-            }
-        }
-
-        async function confirmMerge(waitForRetry) {
-            const waitBtn = document.getElementById('dramaMergeWaitBtn');
-            const nowBtn = document.getElementById('dramaMergeNowBtn');
-            if (waitBtn) waitBtn.disabled = true;
-            if (nowBtn) nowBtn.disabled = true;
-
-            try {
-                const resp = await fetch('/api/drama/merge/confirm', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ drama_id: currentDramaId, wait_for_retry: waitForRetry })
-                });
-                const data = await resp.json();
-                if (data.success) {
-                    if (waitForRetry) {
-                        showToast('正在等待失败镜头重新生成...', 'success');
-                    } else {
-                        showToast('开始合并已成功的镜头...', 'success');
-                    }
-                } else {
-                    showToast('确认失败: ' + (data.error || ''), 'error');
-                    if (waitBtn) waitBtn.disabled = false;
-                    if (nowBtn) nowBtn.disabled = false;
-                }
-            } catch (e) {
-                showToast('确认失败: ' + e.message, 'error');
-                if (waitBtn) waitBtn.disabled = false;
-                if (nowBtn) nowBtn.disabled = false;
             }
         }
 
@@ -2180,6 +2546,30 @@
             }
         }
 
+        async function startShotVideo(shotIndex) {
+            if (!currentDramaId) return;
+            const btn = document.getElementById(`shot-start-${shotIndex}`);
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 启动中...'; }
+
+            try {
+                const resp = await fetch('/api/drama/shot/regenerate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId, shot_index: shotIndex })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(`镜头 ${shotIndex} 开始生成`, 'success');
+                } else {
+                    showToast('启动失败: ' + (data.error || ''), 'error');
+                    if (btn) { btn.disabled = false; btn.textContent = '▶ 生成视频'; }
+                }
+            } catch (e) {
+                showToast('启动失败: ' + e.message, 'error');
+                if (btn) { btn.disabled = false; btn.textContent = '▶ 生成视频'; }
+            }
+        }
+
         async function regenerateShotVideo(shotIndex) {
             if (!currentDramaId) return;
             const btn = document.getElementById(`shot-regen-${shotIndex}`) || document.getElementById(`shot-retry-${shotIndex}`);
@@ -2324,6 +2714,14 @@
             }
         }
 
+        function toggleCustomCharacterStyle() {
+            const select = document.getElementById('dramaCharacterStyle');
+            const customInput = document.getElementById('dramaCustomCharacterStyle');
+            if (select && customInput) {
+                customInput.style.display = select.value === 'custom' ? 'block' : 'none';
+            }
+        }
+
         async function startDrama() {
             const prompt = document.getElementById('dramaPrompt').value.trim();
             if (!prompt) { showToast('请输入短剧描述', 'error'); return; }
@@ -2332,11 +2730,25 @@
             const textModel = document.getElementById('dramaTextModel').value;
             const imageModel = document.getElementById('dramaImageModel').value;
             const videoModel = document.getElementById('dramaVideoModel').value;
+            const characterStyle = document.getElementById('dramaCharacterStyle').value;
+            // 如果选择了自定义风格，获取用户输入的风格描述
+            let customCharacterStyle = '';
+            if (characterStyle === 'custom') {
+                customCharacterStyle = document.getElementById('dramaCustomCharacterStyle').value.trim();
+                if (!customCharacterStyle) {
+                    showToast('请输入自定义角色风格描述', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '🚀 启动短剧生成';
+                    return;
+                }
+            }
             const btn = document.getElementById('btnStartDrama');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading-spinner"></span> 启动中...';
 
             // 重置进度显示
+            storyConfirmed = false;
+            _lastDramaRenderHash = '';
             document.getElementById('dramaProgress').style.display = 'block';
             document.getElementById('dramaScriptSection').style.display = 'none';
             document.getElementById('dramaStorySection').style.display = 'none';
@@ -2345,7 +2757,6 @@
             document.getElementById('dramaStoryboardSection').style.display = 'none';
             document.getElementById('dramaAssetsSection').style.display = 'none';
             document.getElementById('dramaResumeSection').style.display = 'none';
-            document.getElementById('dramaMergeConfirmSection').style.display = 'none';
             document.getElementById('dramaCustomMergeSection').style.display = 'none';
             mergeSelectedShots = [];
             document.getElementById('dramaVideosSection').style.display = 'none';
@@ -2356,14 +2767,16 @@
                 const resp = await fetch('/api/drama/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, shot_duration: shotDuration, text_model: textModel, image_model: imageModel, video_model: videoModel })
+                    body: JSON.stringify({ prompt, shot_duration: shotDuration, text_model: textModel, image_model: imageModel, video_model: videoModel, character_style: characterStyle, custom_character_style: customCharacterStyle })
                 });
                 const data = await resp.json();
                 if (data.success) {
                     currentDramaId = data.drama_id;
                     localStorage.setItem('currentDramaId', currentDramaId);
                     showToast('短剧流水线已启动！', 'success');
+                    // 显示取消与停止按钮（取消：恢复功能；停止：上游功能）
                     document.getElementById('btnCancelDrama').style.display = 'inline-block';
+                    document.getElementById('btnStopDrama').style.display = 'inline-block';
                     startDramaPolling();
                 } else {
                     showToast(data.error || '启动失败', 'error');
@@ -2373,6 +2786,28 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '🎭 开始生成短剧';
+            }
+        }
+
+        async function stopDrama() {
+            if (!currentDramaId) return;
+            if (!confirm('确定要停止短剧生成吗？已完成的素材会保留，但未完成的步骤将中止。')) return;
+
+            try {
+                const resp = await fetch('/api/drama/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已发送停止信号，流水线将在当前步骤完成后停止', 'info');
+                    document.getElementById('btnStopDrama').style.display = 'none';
+                } else {
+                    showToast(data.error || '停止失败', 'error');
+                }
+            } catch (e) {
+                showToast('请求失败: ' + e.message, 'error');
             }
         }
 
@@ -2587,15 +3022,63 @@
                 const data = await resp.json();
                 if (!data.success) return;
 
+                // 防重渲染：计算当前数据哈希，如果与上次相同则跳过 DOM 更新
+                const hashParts = [
+                    data.status,
+                    data.message || '',
+                    data.story ? data.story.substring(0, 100) : '',
+                    data.script ? (typeof data.script === 'string' ? data.script.substring(0, 100) : JSON.stringify(data.script).substring(0, 100)) : '',
+                    JSON.stringify(data.storyboard || {}).substring(0, 200),
+                    JSON.stringify(data.assets || []).substring(0, 200),
+                    JSON.stringify(data.video_results || []).substring(0, 300),
+                    data.merged_video || ''
+                ];
+                const currentHash = hashParts.join('|');
+                if (currentHash === _lastDramaRenderHash) {
+                    // 数据未变化，只更新进度条和步骤标签
+                    const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'paused_video': 65, 'step4': 75, 'completed': 100, 'failed': 100, 'stopped': 100 };
+                    const progress = stepMap[data.status] || 5;
+                    document.getElementById('dramaProgressBar').style.width = progress + '%';
+                    if (data.status === 'failed') document.getElementById('dramaProgressBar').style.background = 'var(--error)';
+                    if (data.status === 'completed') document.getElementById('dramaProgressBar').style.background = 'var(--success)';
+                    if (data.status === 'stopped') document.getElementById('dramaProgressBar').style.background = 'var(--text2)';
+                    const stepLabels = {
+                        'pending': '等待中', 'step1': '① 生成故事+剧本...', 'paused_story': '⏸ 请确认故事梗概', 'step2': '② 生成分镜...',
+                        'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'paused_video': '⏸ 请逐个启动视频生成', 'step4': '④ 生成视频...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'stopped': '⏹ 已停止'
+                    };
+                    document.getElementById('dramaStepBadge').textContent = stepLabels[data.status] || data.status;
+                    document.getElementById('dramaMessage').textContent = data.message || '';
+                    // 完成或失败时停止轮询
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(dramaPollingTimer);
+                        localStorage.removeItem('currentDramaId');
+                        showToast(data.status === 'completed' ? '短剧生成完成！' : '短剧生成失败', data.status === 'completed' ? 'success' : 'error');
+                    }
+                    return;
+                }
+                _lastDramaRenderHash = currentHash;
+
+                // 防编辑中断：如果用户正在编辑任何 textarea 或 input，跳过本次 DOM 重渲染
+                const activeEl = document.activeElement;
+                if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+                    return;
+                }
+
                 // 更新进度条
-                const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'step4': 75, 'paused_merge': 85, 'waiting_retry': 88, 'merging': 90, 'completed': 100, 'failed': 100 };
+                const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'paused_video': 65, 'step4': 75, 'completed': 100, 'failed': 100, 'stopped': 100 };
                 const progress = stepMap[data.status] || 5;
                 document.getElementById('dramaProgressBar').style.width = progress + '%';
                 if (data.status === 'failed') document.getElementById('dramaProgressBar').style.background = 'var(--error)';
                 if (data.status === 'completed') document.getElementById('dramaProgressBar').style.background = 'var(--success)';
+                if (data.status === 'stopped') document.getElementById('dramaProgressBar').style.background = 'var(--text2)';
+
+                // 完成/失败/停止时隐藏停止按钮
+                if (['completed', 'failed', 'stopped'].includes(data.status)) {
+                    document.getElementById('btnStopDrama').style.display = 'none';
+                }
 
                 // 显示故事确认按钮
-                if (data.status === 'paused_story') {
+                if (data.status === 'paused_story' && !storyConfirmed) {
                     document.getElementById('dramaStoryConfirmSection').style.display = 'block';
                     document.getElementById('dramaStoryDirectBtn').disabled = false;
                 } else {
@@ -2609,25 +3092,15 @@
                     document.getElementById('dramaResumeSection').style.display = 'none';
                 }
 
-                // 显示合并确认按钮
-                if (data.status === 'paused_merge') {
-                    document.getElementById('dramaMergeConfirmSection').style.display = 'block';
-                    document.getElementById('dramaMergeConfirmMsg').textContent = '⏸ ' + (data.message || '部分镜头生成失败，是否等待重新生成后再合并？');
-                    document.getElementById('dramaMergeWaitBtn').disabled = false;
-                    document.getElementById('dramaMergeNowBtn').disabled = false;
-                } else if (data.status === 'waiting_retry') {
-                    document.getElementById('dramaMergeConfirmSection').style.display = 'block';
-                    document.getElementById('dramaMergeConfirmMsg').textContent = '⟳ ' + (data.message || '等待失败的镜头重新生成...');
-                    document.getElementById('dramaMergeWaitBtn').disabled = true;
-                    document.getElementById('dramaMergeNowBtn').disabled = true;
-                } else {
-                    document.getElementById('dramaMergeConfirmSection').style.display = 'none';
+                // 显示视频区域（包含每个镜头的独立生成按钮）
+                if (data.status === 'paused_video') {
+                    document.getElementById('dramaVideosSection').style.display = 'block';
                 }
 
                 // 更新步骤标签
                 const stepLabels = {
                     'pending': '等待中', 'step1': '① 生成故事+剧本...', 'paused_story': '⏸ 请确认故事梗概', 'step2': '② 生成分镜...',
-                    'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'step4': '④ 生成视频...', 'paused_merge': '⏸ 镜头合并确认', 'waiting_retry': '⟳ 等待失败镜头重试', 'merging': '⑤ 拼接完整视频...', 'completed': '✅ 完成', 'failed': '❌ 失败'
+                    'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'paused_video': '⏸ 请逐个启动视频生成', 'step4': '④ 生成视频...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'stopped': '⏹ 已停止'
                 };
                 document.getElementById('dramaStepBadge').textContent = stepLabels[data.status] || data.status;
                 document.getElementById('dramaMessage').textContent = data.message || '';
@@ -2671,6 +3144,7 @@
                         const catLabel = { characters: '角色', scenes: '场景', props: '道具' }[a.category] || a.category;
                         const imgSrc = a.local_file ? `/dramas/${currentDramaId}/images/${a.local_file}` : (a.image_url || '');
                         const hasImage = !!imgSrc;
+                        // 显示中文描述
                         const imgPrompt = (a.desc || a.img_prompt || '').replace(/"/g, '&quot;');
                         // 只有在 Step 3 完成后（非生成中）且无图片时才显示失败和重试
                         const isFailed = !hasImage && !isGenerating;
@@ -2696,25 +3170,36 @@
                                         </div>
                                     </div>
                                     <div style="margin-top:6px;">
-                                        <button onclick="toggleAssetPrompt(${idx})" style="font-size:10px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:3px;padding:1px 6px;cursor:pointer;">📝 提示词</button>
-                                        <div id="asset-prompt-area-${idx}" style="display:none;margin-top:4px;">
-                                            <textarea id="asset-prompt-${idx}" style="width:100%;height:80px;font-size:10px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;">${imgPrompt}</textarea>
-                                            <div style="display:flex;gap:4px;margin-top:3px;">
-                                                <button onclick="optimizeAssetPrompt(${idx})" id="btn-optimize-asset-${idx}" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;">✨ 优化</button>
-                                                <button onclick="regenerateWithPrompt(${idx})" style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;">✏️ 修改并重新生成</button>
-                                            </div>
+                                        <div style="font-size:11px;font-weight:600;margin-bottom:3px;">📝 角色描述（可编辑后重新生成）</div>
+                                        <textarea id="asset-prompt-${idx}" style="width:100%;min-height:80px;height:auto;font-size:13px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px;resize:vertical;line-height:1.4;overflow:hidden;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${imgPrompt}</textarea>
+                                        <div style="display:flex;gap:4px;margin-top:4px;">
+                                            <button onclick="optimizeAssetPrompt(${idx})" id="btn-optimize-asset-${idx}" style="font-size:12px;color:#fff;background:var(--accent);border:none;border-radius:4px;padding:3px 10px;cursor:pointer;">✨ 优化</button>
+                                            <button onclick="regenerateWithPrompt(${idx})" style="font-size:12px;color:#fff;background:var(--accent);border:none;border-radius:4px;padding:3px 10px;cursor:pointer;">✏️ 修改并重新生成</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         `;
                     }).join('');
+                    // 自动撑高提示词 textarea
+                    el.querySelectorAll('textarea[id^="asset-prompt-"]').forEach(ta => {
+                        ta.style.height = 'auto';
+                        ta.style.height = ta.scrollHeight + 'px';
+                    });
                 }
 
                 // 显示视频
                 if (data.video_results && data.video_results.length > 0) {
                     document.getElementById('dramaVideosSection').style.display = 'block';
                     const el = document.getElementById('dramaVideosContent');
+
+                    // 保存提示词编辑状态（防止轮询重渲染导致内容丢失）
+                    const savedShotPromptValues = {};
+                    data.video_results.forEach(v => {
+                        const si = v.shot_index;
+                        const ta = document.getElementById(`shot-prompt-${si}`);
+                        if (ta) savedShotPromptValues[si] = ta.value;
+                    });
                     
                     // 合并后的完整视频
                     let mergedHtml = '';
@@ -2742,7 +3227,6 @@
                         const detail = shotDetails[si] || {};
                         const videoPrompt = detail.video_prompt_cn || detail.video_prompt || v.prompt || '';
                         const refImages = detail.reference_images || [];
-                        const promptPreview = videoPrompt.length > 150 ? videoPrompt.substring(0, 150) + '...' : videoPrompt;
                         
                         // 参考图缩略图
                         const refImgsHtml = refImages.length > 0 ? refImages.map((img, imgIdx) => {
@@ -2773,15 +3257,15 @@
                                     <span style="font-size:10px;color:var(--text2);">无参考图，可点击+上传</span>
                                 </div>`}
                                 <div>
-                                    <div style="font-size:10px;font-weight:600;cursor:pointer;" onclick="toggleShotPrompt(${si})">📝 提示词 <span style="color:var(--text2);font-weight:400;">(展开/收起)</span></div>
-                                    <div id="shot-prompt-area-${si}" style="display:none;margin-top:3px;">
-                                        <textarea id="shot-prompt-${si}" style="width:100%;height:80px;font-size:10px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;">${videoPrompt}</textarea>
-                                        <div style="display:flex;gap:4px;margin-top:3px;">
+                                    <div style="font-size:11px;font-weight:600;margin-bottom:3px;">📝 视频提示词</div>
+                                    <div id="shot-prompt-area-${si}">
+                                        <textarea id="shot-prompt-${si}" style="width:100%;height:100px;font-size:13px;font-family:monospace;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px;resize:vertical;line-height:1.5;">${videoPrompt}</textarea>
+                                        <div style="display:flex;gap:4px;margin-top:4px;">
                                             <button class="btn btn-sm" onclick="optimizeShotPrompt(${si})" id="btn-optimize-shot-${si}" style="font-size:10px;padding:2px 8px;">✨ 优化提示词</button>
-                                            <button style="font-size:10px;color:#fff;background:var(--accent);border:none;border-radius:3px;padding:2px 8px;cursor:pointer;" onclick="regenerateShotWithPrompt(${si})">✏️ 用修改后的提示词重新生成</button>
+                                            <button style="font-size:12px;color:#fff;background:var(--accent);border:none;border-radius:4px;padding:4px 12px;cursor:pointer;" onclick="regenerateShotWithPrompt(${si})">✏️ 用修改后的提示词重新生成</button>
                                         </div>
                                     </div>
-                                    <div id="shot-prompt-preview-${si}" style="font-size:10px;color:var(--accent);font-family:monospace;margin-top:2px;word-break:break-all;">${promptPreview}</div>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -2816,9 +3300,21 @@
                             `;
                         } else if (v.status === 'generating') {
                             return `
-                                <div style="background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px;" id="shot-result-${si}">
-                                    <div style="font-size:13px;">镜头 ${si} <span style="color:var(--accent);font-size:11px;">⟳ 重新生成中...</span></div>
+                                <div style="background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px;" id="shot-card-${si}">
+                                    <div style="font-size:13px;font-weight:600;margin-bottom:8px;">镜头 ${si} <span style="color:var(--accent);font-size:11px;">⟳ 视频生成中...</span></div>
                                     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+                                        <div style="flex-shrink:0;"><div style="width:100%;max-width:360px;height:200px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:var(--radius-sm);"><span class="loading-spinner" style="margin-right:8px;"></span><span style="color:var(--text2);font-size:13px;">正在生成视频，请耐心等待...</span></div></div>
+                                        ${infoPanel}
+                                    </div>
+                                </div>
+                            `;
+                        } else if (v.status === 'pending') {
+                            return `
+                                <div style="background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px;" id="shot-card-${si}">
+                                    <div style="font-size:13px;font-weight:600;margin-bottom:8px;">镜头 ${si} <span style="color:var(--text2);font-size:11px;">⏳ 待生成</span>
+                                        <button style="float:right;font-size:12px;color:#fff;background:var(--success);border:none;border-radius:4px;padding:4px 14px;cursor:pointer;font-weight:600;" onclick="startShotVideo(${si})" id="shot-start-${si}">▶ 生成视频</button>
+                                    </div>
+                                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
                                         ${infoPanel}
                                     </div>
                                 </div>
@@ -2833,7 +3329,13 @@
                     }).join('');
                     
                     el.innerHTML = mergedHtml + shotsHtml;
-                    
+
+                    // 恢复提示词编辑状态
+                    Object.keys(savedShotPromptValues).forEach(si => {
+                        const ta = document.getElementById(`shot-prompt-${si}`);
+                        if (ta) ta.value = savedShotPromptValues[si];
+                    });
+
                     // 显示自定义合并面板（有完成的视频时）
                     const hasCompleted = data.video_results.some(v => v.status === 'completed' && v.local_file);
                     if (hasCompleted) {
@@ -2889,6 +3391,197 @@
                 closeLightbox();
             }
         });
+        // ==================== 数字人口播 ====================
+        let anchorPollingTimer = null;
+        let currentAnchorTaskId = null;
+        let anchorModelsLoaded = false;
+
+        async function loadAnchorModels() {
+            if (anchorModelsLoaded) return;
+            try {
+                const resp = await fetch('/api/anchor/models');
+                const data = await resp.json();
+                if (!data.success) return;
+                function fillSelect(elId, models, defaultVal) {
+                    const el = document.getElementById(elId);
+                    if (!el) return;
+                    el.innerHTML = '';
+                    for (const [val, label] of Object.entries(models)) {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = label;
+                        if (val === defaultVal) opt.selected = true;
+                        el.appendChild(opt);
+                    }
+                }
+                fillSelect('anchorTextModel', data.text_models, data.defaults.text_model);
+                fillSelect('anchorImageModel', data.image_models, data.defaults.image_model);
+                fillSelect('anchorVideoModel', data.video_models, data.defaults.video_model);
+                anchorModelsLoaded = true;
+            } catch (e) {
+                console.error('Failed to load anchor models:', e);
+            }
+        }
+
+        function switchAnchorMode(mode) {
+            ['A', 'B', 'C'].forEach(m => {
+                const panel = document.getElementById(`anchor-mode-${m}-panel`);
+                const label = document.getElementById(`anchor-mode-${m}-label`);
+                if (panel) panel.style.display = m === mode ? 'block' : 'none';
+                if (label) label.style.border = m === mode ? '2px solid var(--accent)' : '2px solid transparent';
+            });
+        }
+
+        async function startAnchorGeneration() {
+            const script = document.getElementById('anchorScript').value.trim();
+            if (!script) { showToast('请输入文稿内容', 'error'); return; }
+
+            const mode = document.querySelector('input[name="anchorMode"]:checked').value;
+            const voice = document.getElementById('anchorVoice').value;
+            let avatar_file = '';
+            let video_prompt = '';
+
+            // 上传文件
+            const btn = document.getElementById('anchorStartBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 处理中...';
+
+            try {
+                if (mode === 'A') {
+                    const fileInput = document.getElementById('anchorAvatarImage');
+                    if (!fileInput.files.length) { showToast('请上传数字人形象图片', 'error'); btn.disabled = false; btn.textContent = '🎙 开始生成数字人口播视频'; return; }
+                    const fd = new FormData();
+                    fd.append('file', fileInput.files[0]);
+                    const uploadResp = await fetch('/api/anchor/upload', { method: 'POST', body: fd });
+                    const uploadData = await uploadResp.json();
+                    if (!uploadData.success) { showToast('上传失败: ' + uploadData.error, 'error'); btn.disabled = false; btn.textContent = '🎙 开始生成数字人口播视频'; return; }
+                    avatar_file = uploadData.filename;
+                } else if (mode === 'B') {
+                    const fileInput = document.getElementById('anchorAvatarVideo');
+                    if (!fileInput.files.length) { showToast('请上传数字人视频素材', 'error'); btn.disabled = false; btn.textContent = '🎙 开始生成数字人口播视频'; return; }
+                    const fd = new FormData();
+                    fd.append('file', fileInput.files[0]);
+                    const uploadResp = await fetch('/api/anchor/upload', { method: 'POST', body: fd });
+                    const uploadData = await uploadResp.json();
+                    if (!uploadData.success) { showToast('上传失败: ' + uploadData.error, 'error'); btn.disabled = false; btn.textContent = '🎙 开始生成数字人口播视频'; return; }
+                    avatar_file = uploadData.filename;
+                } else {
+                    video_prompt = document.getElementById('anchorVideoPrompt').value.trim();
+                    if (!video_prompt) { showToast('请输入画面风格提示词', 'error'); btn.disabled = false; btn.textContent = '🎙 开始生成数字人口播视频'; return; }
+                }
+
+                // 提交生成任务
+                const minDuration = parseInt(document.getElementById('anchorMinDuration').value);
+                const textModel = document.getElementById('anchorTextModel').value;
+                const imageModel = document.getElementById('anchorImageModel').value;
+                const videoModel = document.getElementById('anchorVideoModel').value;
+
+                const resp = await fetch('/api/anchor/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script, mode, voice, avatar_file, video_prompt, min_duration: minDuration, text_model: textModel, image_model: imageModel, video_model: videoModel })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    currentAnchorTaskId = data.task_id;
+                    showToast('任务已提交，开始生成...', 'success');
+                    document.getElementById('anchorProgress').style.display = 'block';
+                    startAnchorPolling();
+                } else {
+                    showToast('提交失败: ' + data.error, 'error');
+                }
+            } catch (e) {
+                showToast('请求失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🎙 开始生成数字人口播视频';
+            }
+        }
+
+        function startAnchorPolling() {
+            if (anchorPollingTimer) clearInterval(anchorPollingTimer);
+            anchorPollingTimer = setInterval(pollAnchorStatus, 3000);
+            pollAnchorStatus();
+        }
+
+        async function pollAnchorStatus() {
+            if (!currentAnchorTaskId) return;
+            try {
+                const resp = await fetch(`/api/anchor/status?task_id=${currentAnchorTaskId}`);
+                const data = await resp.json();
+                if (!data.success || !data.task) return;
+
+                const task = data.task;
+                renderAnchorProgress(task);
+
+                if (task.status === 'completed') {
+                    clearInterval(anchorPollingTimer);
+                    showToast('数字人口播视频生成完成！', 'success');
+                } else if (task.status === 'failed' || task.status === 'cancelled') {
+                    clearInterval(anchorPollingTimer);
+                    showToast(task.message || '生成失败', 'error');
+                }
+            } catch (e) {
+                console.error('Anchor poll error:', e);
+            }
+        }
+
+        function renderAnchorProgress(task) {
+            const el = document.getElementById('anchorProgressContent');
+            const stepMap = {
+                'init': '⏳ 初始化',
+                'segment': '📝 文稿分段',
+                'tts': '🔊 TTS 配音',
+                'visual': '🎬 画面生成',
+                'compose': '🎞 视频合成',
+                'merge': '🔗 最终拼接',
+                'completed': '✅ 完成'
+            };
+            const stepLabels = ['init', 'segment', 'tts', 'visual', 'compose', 'merge', 'completed'];
+            const currentIdx = stepLabels.indexOf(task.step);
+
+            let html = '<div style="margin-bottom:12px;">';
+            stepLabels.forEach((s, i) => {
+                const done = i < currentIdx;
+                const current = i === currentIdx;
+                const color = done ? 'var(--success)' : current ? 'var(--accent)' : 'var(--text3)';
+                const weight = current ? '600' : '400';
+                html += `<span style="color:${color};font-weight:${weight};margin-right:12px;font-size:12px;">${stepMap[s] || s}</span>`;
+            });
+            html += '</div>';
+            html += `<div style="color:var(--text2);font-size:12px;margin-bottom:8px;">${task.message || ''}</div>`;
+
+            // 显示分段信息
+            if (task.segments && task.segments.length > 0) {
+                html += `<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">共 ${task.segments.length} 段</div>`;
+                html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                task.segments.forEach((seg, i) => {
+                    const hasAudio = seg.audio_file ? '✅' : '⏳';
+                    const hasVisual = seg.visual_path ? '✅' : '⏳';
+                    const dur = seg.duration ? `${seg.duration}s` : '--';
+                    html += `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:11px;">`;
+                    html += `第${i+1}段 ${dur} | 🎵${hasAudio} 🎬${hasVisual}`;
+                    html += `</div>`;
+                });
+                html += '</div>';
+            }
+
+            el.innerHTML = html;
+
+            // 显示结果视频
+            if (task.status === 'completed' && task.output_file) {
+                const resultEl = document.getElementById('anchorResult');
+                const resultContent = document.getElementById('anchorResultContent');
+                resultEl.style.display = 'block';
+                const videoUrl = `/anchor/${currentAnchorTaskId}/${task.output_file}`;
+                resultContent.innerHTML = `
+                    <video controls style="width:100%;max-width:300px;border-radius:var(--radius-sm);" src="${videoUrl}"></video>
+                    <div style="margin-top:8px;">
+                        <a href="${videoUrl}" download style="color:var(--accent);font-size:13px;">📥 下载视频</a>
+                    </div>
+                `;
+            }
+        }
 
     </script>
     <!-- Lightbox 图片放大查看遮罩（合并 V7 时丢失，已恢复） -->

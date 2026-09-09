@@ -15,15 +15,22 @@ def call_text_model(system_prompt, user_prompt, api_key, model=None, max_tokens=
     
     Args:
         model: 模型名称，默认使用 DEFAULT_TEXT_MODEL
-        api_key: 对应厂商的 API Key
+        api_key: 对应厂商的 API Key（Ollama 不需要）
     """
     if model is None:
         model = DEFAULT_TEXT_MODEL
     base_url = get_text_base_url(model)
+    
+    # Ollama 不需要 API Key，使用哑认证
+    from ..config import get_vendor_from_model
+    is_ollama = get_vendor_from_model(model) == 'ollama'
+    
     headers = {
-        'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
+    if not is_ollama:
+        headers['Authorization'] = f'Bearer {api_key}'
+    
     payload = {
         'model': model,
         'messages': [
@@ -33,7 +40,9 @@ def call_text_model(system_prompt, user_prompt, api_key, model=None, max_tokens=
         'max_tokens': max_tokens,
         'temperature': 0.7
     }
-    print(f"[文本模型] model={model}, base_url={base_url}")
+    # Ollama 本地模型使用更长的超时时间（本地推理较慢）
+    req_timeout = 600 if is_ollama else 300
+    print(f"[文本模型] model={model}, base_url={base_url}{' (Ollama本地)' if is_ollama else ''}")
     max_retries = 3
     for attempt in range(max_retries + 1):
         try:
@@ -41,7 +50,7 @@ def call_text_model(system_prompt, user_prompt, api_key, model=None, max_tokens=
                 f'{base_url}/chat/completions',
                 headers=headers,
                 json=payload,
-                timeout=300
+                timeout=req_timeout
             )
             # 检查 Content-Type，避免 HTML 错误页被当作 JSON 解析
             content_type = resp.headers.get('Content-Type', '')
@@ -169,6 +178,33 @@ def _repair_truncated_json(text):
             i += 1
             continue
     
+    # 辅助函数：根据未闭合的括号栈生成闭合字符串（逆序闭合）
+    def _closing_for_stack(stk):
+        return ''.join('}' if c == '{' else ']' for c in reversed(stk))
+    
+    # 辅助函数：重新计算给定文本的未闭合括号栈
+    def _unclosed_stack(txt):
+        stk = []
+        in_s = False
+        es = False
+        for c in txt:
+            if es:
+                es = False
+                continue
+            if c == '\\' and in_s:
+                es = True
+                continue
+            if c == '"':
+                in_s = not in_s
+                continue
+            if not in_s:
+                if c in '{[':
+                    stk.append(c)
+                elif c in '}]':
+                    if stk:
+                        stk.pop()
+        return stk
+    
     # 到达末尾，JSON 被截断
     # 尝试从最后完成的位置截断并闭合
     if last_complete_pos > 0:
@@ -178,28 +214,9 @@ def _repair_truncated_json(text):
             candidate = candidate[:-1]
         if candidate and candidate[-1] == ',':
             candidate = candidate[:-1]
-        # 闭合所有未闭合的括号
-        # 重新计算未闭合的括号
-        open_braces = 0
-        open_brackets = 0
-        in_str = False
-        esc = False
-        for c in candidate:
-            if esc:
-                esc = False
-                continue
-            if c == '\\' and in_str:
-                esc = True
-                continue
-            if c == '"':
-                in_str = not in_str
-                continue
-            if not in_str:
-                if c == '{': open_braces += 1
-                elif c == '}': open_braces -= 1
-                elif c == '[': open_brackets += 1
-                elif c == ']': open_brackets -= 1
-        candidate += '}' * max(0, open_braces) + ']' * max(0, open_brackets)
+        # 用栈计算未闭合的括号，逆序闭合
+        stk = _unclosed_stack(candidate)
+        candidate += _closing_for_stack(stk)
         try:
             result = json.loads(candidate)
             print(f"[JSON修复] 截断的 JSON 已自动修复（保留到位置 {last_complete_pos}）")
@@ -208,31 +225,17 @@ def _repair_truncated_json(text):
             pass
     
     # 如果上面的方法失败，尝试更激进的方法：直接在末尾闭合
-    # 先尝试关闭当前字符串
     candidate = text
     if in_string:
+        # 如果文本以未转义的反斜杠结尾（escape_next=True），
+        # 直接加 " 会被 \ 转义成 \"，字符串无法闭合
+        # 需要先加一个 \ 来转义前一个 \，再加 " 闭合字符串
+        if escape_next:
+            candidate += '\\'
         candidate += '"'
-    # 闭合所有括号
-    open_braces = 0
-    open_brackets = 0
-    in_str = False
-    esc = False
-    for c in candidate:
-        if esc:
-            esc = False
-            continue
-        if c == '\\' and in_str:
-            esc = True
-            continue
-        if c == '"':
-            in_str = not in_str
-            continue
-        if not in_str:
-            if c == '{': open_braces += 1
-            elif c == '}': open_braces -= 1
-            elif c == '[': open_brackets += 1
-            elif c == ']': open_brackets -= 1
-    candidate += '}' * max(0, open_braces) + ']' * max(0, open_brackets)
+    # 用栈计算未闭合的括号，逆序闭合
+    stk = _unclosed_stack(candidate)
+    candidate += _closing_for_stack(stk)
     try:
         result = json.loads(candidate)
         print(f"[JSON修复] 截断的 JSON 已激进修复")
@@ -411,6 +414,13 @@ def build_video_prompt(shot, shot_assets):
     
     # 【重要】禁止视频模型生成任何文字/字幕，中文字幕由 ffmpeg 后期烧录
     en_prompt = "No text, no subtitles, no captions, no labels, no written words, no letters, no signs, no watermarks, no typography, no writing of any kind should appear anywhere in the video. Pure cinematic scene only. "
+    
+    # 【角色一致性】在提示词开头强调必须严格匹配参考图
+    if shot_assets:
+        char_names = [a.get('name', '') for a in shot_assets if a.get('category') == 'characters']
+        if char_names:
+            en_prompt += f"STRICT CHARACTER CONSISTENCY REQUIRED: All characters ({', '.join(char_names)}) MUST appear exactly as shown in the reference images. Their facial features, hairstyle, hair color, skin tone, body proportions, clothing style and colors must match the reference images PRECISELY. Do NOT redesign, reinterpret, or alter any character's appearance in any way. "
+    
     en_prompt += base_prompt
     
     # 中文提示词（供前端展示）
@@ -440,8 +450,8 @@ def build_video_prompt(shot, shot_assets):
             if cat == 'characters':
                 char_descs.append(f"{name}: {desc}")
                 char_descs_cn.append(f"{name}: {desc_cn}")
-                # 【面部一致性】强调面部特征
-                en_prompt += f" CRUCIAL: The character {name}'s facial features (face shape, eye shape, nose, mouth, skin tone, hair style and color) in the video MUST exactly match the reference image. Do NOT alter or reimagine the character's face."
+                # 【面部一致性】强调面部特征和整体外观
+                en_prompt += f" CRITICAL for {name}: Face (face shape, eye shape and color, nose shape, mouth, eyebrows, skin tone), hair (style, color, length), body (height, build, proportions), and clothing (style, color, pattern) MUST EXACTLY match the reference image. Even minor deviations are NOT acceptable."
             elif cat == 'scenes':
                 scene_descs.append(desc)
                 scene_descs_cn.append(desc_cn)
@@ -452,8 +462,8 @@ def build_video_prompt(shot, shot_assets):
         consistency_parts = []
         consistency_parts_cn = []
         if char_descs:
-            consistency_parts.append("Character appearance (MUST match exactly, especially facial features): " + "; ".join(char_descs))
-            consistency_parts_cn.append("角色外观(必须严格一致，尤其是面部特征): " + "; ".join(char_descs_cn))
+            consistency_parts.append("CHARACTER REFERENCE (appearance MUST match reference images exactly): " + "; ".join(char_descs))
+            consistency_parts_cn.append("角色参考(外观必须严格匹配参考图): " + "; ".join(char_descs_cn))
         if prop_descs:
             consistency_parts.append("Props: " + "; ".join(prop_descs))
             consistency_parts_cn.append("道具: " + "; ".join(prop_descs_cn))
@@ -484,12 +494,15 @@ def translate_cn_to_en(text, api_key, model=None):
     if not text or not is_mostly_chinese(text):
         return text  # 已经是英文，直接返回
     try:
-        from ..config import get_vendor_api_key, get_vendor_base_url
+        from ..config import get_vendor_api_key, get_vendor_base_url, get_vendor_from_model
         from ..models import DEFAULT_TEXT_MODEL
         model = model or DEFAULT_TEXT_MODEL
         base_url = get_vendor_base_url(model)
+        is_ollama = get_vendor_from_model(model) == 'ollama'
         key = api_key or get_vendor_api_key(model)
-        headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
+        headers = {'Content-Type': 'application/json'}
+        if not is_ollama:
+            headers['Authorization'] = f'Bearer {key}'
         payload = {
             'model': model,
             'messages': [
@@ -500,7 +513,7 @@ def translate_cn_to_en(text, api_key, model=None):
             'temperature': 0.3
         }
         import requests
-        resp = requests.post(f'{base_url}/chat/completions', headers=headers, json=payload, timeout=60)
+        resp = requests.post(f'{base_url}/chat/completions', headers=headers, json=payload, timeout=120 if is_ollama else 60)
         if resp.status_code == 200:
             result = resp.json()
             translated = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()

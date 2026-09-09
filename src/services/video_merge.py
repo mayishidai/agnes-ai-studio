@@ -4,6 +4,7 @@
 """
 
 import os
+import sys
 import subprocess
 import json
 from datetime import datetime
@@ -29,28 +30,28 @@ def get_ffmpeg_path():
 
 
 def get_ffprobe_path():
-    """获取 ffprobe 路径（和 ffmpeg 同目录）"""
+    """获取 ffprobe 路径（跨平台兼容）"""
     ffmpeg = get_ffmpeg_path()
     if not ffmpeg:
         return None
     if ffmpeg == 'ffmpeg':
         # 系统 PATH 中的 ffmpeg
+        ffprobe_cmd = 'ffprobe.exe' if sys.platform == 'win32' else 'ffprobe'
         try:
-            result = subprocess.run(['ffprobe', '-version'], capture_output=True, text=True, timeout=5)
+            result = subprocess.run([ffprobe_cmd, '-version'], capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
-                return 'ffprobe'
+                return ffprobe_cmd
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         return None
     else:
         # imageio-ffmpeg 内置的，同目录下找 ffprobe
         ffmpeg_dir = os.path.dirname(ffmpeg)
-        ffprobe = os.path.join(ffmpeg_dir, 'ffprobe')
-        if os.path.exists(ffprobe):
-            return ffprobe
-        ffprobe_exe = os.path.join(ffmpeg_dir, 'ffprobe.exe')
-        if os.path.exists(ffprobe_exe):
-            return ffprobe_exe
+        # 跨平台查找：先找无后缀（macOS/Linux），再找 .exe（Windows）
+        for name in ['ffprobe', 'ffprobe.exe']:
+            ffprobe = os.path.join(ffmpeg_dir, name)
+            if os.path.exists(ffprobe):
+                return ffprobe
         return None
 
 
@@ -181,26 +182,63 @@ def burn_chinese_subtitle(video_path, dialogue_text, output_path=None):
 
 
 def _find_chinese_font():
-    """查找系统中可用的中文字体"""
-    # Windows 常见中文字体路径
-    windir = os.environ.get('WINDIR', 'C:\\Windows')
-    font_dir = os.path.join(windir, 'Fonts')
-    
-    chinese_fonts = [
-        'msyh.ttc',      # 微软雅黑
-        'msyhbd.ttc',    # 微软雅黑 Bold
-        'simhei.ttf',    # 黑体
-        'simsun.ttc',    # 宋体
-        'simkai.ttf',    # 楷体
-        'STZHONGS.TTF',  # 华文宋体
-        'STKAITI.ttf',   # 华文楷体
-    ]
-    
-    for font in chinese_fonts:
-        font_path = os.path.join(font_dir, font)
-        if os.path.exists(font_path):
-            return font_path
-    
+    """查找系统中可用的中文字体（跨平台：Windows / macOS / Linux）"""
+    search_dirs = []
+    candidates = []
+
+    if sys.platform == 'win32':
+        windir = os.environ.get('WINDIR', 'C:\\Windows')
+        search_dirs.append(os.path.join(windir, 'Fonts'))
+        candidates = [
+            'msyh.ttc',      # 微软雅黑
+            'msyhbd.ttc',    # 微软雅黑 Bold
+            'simhei.ttf',    # 黑体
+            'simsun.ttc',    # 宋体
+            'simkai.ttf',    # 楷体
+            'STZHONGS.TTF',  # 华文宋体
+            'STKAITI.ttf',   # 华文楷体
+        ]
+    elif sys.platform == 'darwin':
+        # macOS 字体路径
+        search_dirs = [
+            '/System/Library/Fonts',
+            '/System/Library/Fonts/Supplemental',
+            '/Library/Fonts',
+            os.path.expanduser('~/Library/Fonts'),
+        ]
+        candidates = [
+            'PingFang.ttc',             # 苹方（macOS 默认中文）
+            'STHeiti Light.ttc',        # 华文黑体 Light
+            'STHeiti Medium.ttc',       # 华文黑体 Medium
+            'Songti.ttc',               # 宋体
+            'STSong.ttf',               # 华文宋体
+            'Kaiti.ttc',                # 楷体
+            'Hiragino Sans GB.ttc',     # 冬青黑体简中
+            'Arial Unicode.ttf',        # Arial Unicode
+        ]
+    else:
+        # Linux 字体路径
+        search_dirs = [
+            '/usr/share/fonts',
+            '/usr/local/share/fonts',
+            os.path.expanduser('~/.fonts'),
+            os.path.expanduser('~/.local/share/fonts'),
+        ]
+        candidates = [
+            'wqy-zenhei/wqy-zenhei.ttc',
+            'wqy-microhei/wqy-microhei.ttc',
+            'truetype/wqy/wqy-zenhei.ttc',
+            'truetype/wqy/wqy-microhei.ttc',
+            'NotoSansCJK-Regular.ttc',
+            'NotoSansSC-Regular.otf',
+        ]
+
+    for d in search_dirs:
+        for font in candidates:
+            font_path = os.path.join(d, font)
+            if os.path.exists(font_path):
+                return font_path
+
     return None
 
 

@@ -118,7 +118,8 @@ VENDOR_BASE_URLS = {
     'gpt': 'https://api.openai.com/v1',
     'qwen': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     'doubao': 'https://ark.cn-beijing.volces.com/api/v3',
-    'minimax': 'https://api.minimaxi.chat/v1',
+    'minimax': 'https://api.minimaxi.com/v1',
+    'ollama': 'http://localhost:11434/v1',  # Ollama 本地部署
 }
 
 # 兼容旧名称
@@ -131,11 +132,20 @@ def get_vendor_from_model(model):
     if not model:
         return 'agnes'
     model_lower = model.lower()
+    # Ollama 模型名称前缀检测
+    if model_lower.startswith('ollama:') or model_lower.startswith('ollama/'):
+        return 'ollama'
     for prefix in VENDOR_BASE_URLS:
-        if prefix == 'agnes':
+        if prefix in ('agnes', 'ollama'):
             continue
         if model_lower.startswith(prefix):
             return prefix
+    # 检查是否是 Ollama 动态检测到的模型（存储在配置中）
+    ollama_config = get_ollama_config()
+    if ollama_config.get('enabled'):
+        ollama_models = ollama_config.get('models', [])
+        if model in ollama_models:
+            return 'ollama'
     return 'agnes'
 
 def get_vendor_base_url(model):
@@ -162,6 +172,11 @@ def get_vendor_base_url(model):
 
 def get_vendor_api_key(model, fallback_key=None):
     """根据模型名称获取厂商 API Key（优先检查自定义模型，其次厂商专用 Key，回退到全局 Key）"""
+    # Ollama 不需要 API Key
+    vendor = get_vendor_from_model(model)
+    if vendor == 'ollama':
+        return 'ollama'
+    
     # 先检查自定义模型
     custom_config = get_custom_model_config(model)
     if custom_config and custom_config.get('api_key'):
@@ -285,3 +300,45 @@ def get_custom_models_by_type(model_type):
         if m['type'] == model_type:
             result[m['id']] = f"{m['name']} (自定义)"
     return result
+
+
+# ==================== Ollama 配置 ====================
+
+OLLAMA_DEFAULT_URL = 'http://localhost:11434'
+
+def get_ollama_config():
+    """获取 Ollama 配置"""
+    config_file = get_config_path()
+    if os.path.exists(config_file):
+        with open(config_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get('ollama', {'enabled': False, 'base_url': OLLAMA_DEFAULT_URL, 'models': []})
+    return {'enabled': False, 'base_url': OLLAMA_DEFAULT_URL, 'models': []}
+
+
+def save_ollama_config(ollama_config):
+    """保存 Ollama 配置"""
+    config_file = get_config_path()
+    data = {}
+    if os.path.exists(config_file):
+        with open(config_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    data['ollama'] = ollama_config
+    with open(config_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_ollama_models():
+    """从 Ollama 服务获取可用模型列表"""
+    import requests
+    ollama_config = get_ollama_config()
+    base_url = ollama_config.get('base_url', OLLAMA_DEFAULT_URL).rstrip('/')
+    try:
+        resp = requests.get(f'{base_url}/api/tags', timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            models = [m['name'] for m in data.get('models', [])]
+            return models
+    except Exception as e:
+        print(f"[Ollama] 获取模型列表失败: {e}")
+    return []

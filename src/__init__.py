@@ -28,6 +28,7 @@ def create_app():
     from .routes.video import video_bp
     from .routes.drama import drama_bp
     from .routes.files import files_bp
+    from .routes.anchor import anchor_bp
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(config_bp)
@@ -35,6 +36,7 @@ def create_app():
     app.register_blueprint(video_bp)
     app.register_blueprint(drama_bp)
     app.register_blueprint(files_bp)
+    app.register_blueprint(anchor_bp)
 
     # 蓝图注册完成后，从磁盘恢复短剧任务
     from .models import load_drama_tasks
