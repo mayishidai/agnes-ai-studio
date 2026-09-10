@@ -833,6 +833,16 @@
                             <option value="semi_realistic">半写实插画</option>
                             <option value="watercolor">水彩手绘</option>
                             <option value="ink">中国水墨</option>
+                            <option value="ghibli">吉卜力手绘</option>
+                            <option value="comic_us">美漫厚涂</option>
+                            <option value="cyberpunk">赛博朋克</option>
+                            <option value="sci_fi">科幻机甲</option>
+                            <option value="oil_painting">古典油画</option>
+                            <option value="ukiyoe">浮世绘</option>
+                            <option value="sketch">铅笔素描</option>
+                            <option value="claymation">黏土定格</option>
+                            <option value="lowpoly">低多边形3D</option>
+                            <option value="pixel">像素游戏</option>
                             <option value="custom">自定义风格...</option>
                         </select>
                         <input type="text" class="form-input" id="dramaCustomCharacterStyle" placeholder="请输入自定义角色风格描述，例如：赛博朋克风格、复古油画风格..." style="display:none;margin-top:6px;">
@@ -869,6 +879,11 @@
                         </div>
                         <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text2);">
                             <span>① 故事+剧本</span><span>② 分镜</span><span>③ 三视图</span><span>④ 视频</span><span>⑤ 拼接</span>
+                        </div>
+                        <!-- 中断任务恢复入口：基于已保存的分镜/素材重新计算提示词 -->
+                        <div id="dramaRebuildSection" style="display:none;margin-top:12px;">
+                            <button id="btnRebuildPrompts" class="btn btn-primary" onclick="rebuildDramaPrompts()" style="width:100%;">🔄 恢复分镜提示词（从中断处继续）</button>
+                            <div style="font-size:11px;color:var(--text2);margin-top:6px;text-align:center;">基于已保存的分镜与素材重新计算提示词，已生成的视频会保留</div>
                         </div>
                     </div>
                 </div>
@@ -1254,8 +1269,16 @@
                         document.getElementById('dramaProgress').style.display = 'block';
                         // 切换到短剧 tab
                         switchTab('drama');
+                        // 回填任务原始描述（"短剧描述"随之恢复）
+                        const ta = document.getElementById('dramaPrompt');
+                        if (ta && !ta.value.trim() && data.prompt) ta.value = data.prompt;
                         // 立即轮询一次恢复 UI
                         startDramaPolling();
+                        // 滚动到详情区，让用户立刻看到已恢复的故事/剧本/分镜/提示词
+                        setTimeout(() => {
+                            const el = document.getElementById('dramaProgress');
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 400);
                         showToast('已恢复短剧任务状态', 'info');
                     } else {
                         localStorage.removeItem('currentDramaId');
@@ -2252,6 +2275,33 @@
             }
         }
 
+        // ========== 中断任务恢复：重新计算分镜提示词（全链路状态保留的续跑入口） ==========
+        async function rebuildDramaPrompts() {
+            if (!currentDramaId) return;
+            const btn = document.getElementById('btnRebuildPrompts');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在恢复分镜提示词...'; }
+            try {
+                const resp = await fetch('/api/drama/rebuild_prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: currentDramaId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('开始恢复分镜提示词，完成后可逐个启动视频生成', 'success');
+                    localStorage.setItem('currentDramaId', currentDramaId);
+                    document.getElementById('dramaRebuildSection').style.display = 'none';
+                    startDramaPolling();
+                } else {
+                    showToast(data.error || '恢复失败', 'error');
+                    if (btn) { btn.disabled = false; btn.textContent = '🔄 恢复分镜提示词'; }
+                }
+            } catch (e) {
+                showToast('恢复失败: ' + e.message, 'error');
+                if (btn) { btn.disabled = false; btn.textContent = '🔄 恢复分镜提示词'; }
+            }
+        }
+
         // ========== 故事编辑功能 ==========
         let storyConfirmed = false;  // 用户已确认故事，防止轮询重新显示确认弹窗
 
@@ -2824,7 +2874,7 @@
             all: null,
             completed: ['completed'],
             failed: ['failed'],
-            in_progress: ['step1','step2','step3','step4','merging','pending'],
+            in_progress: ['step1','step2','step3','step4','merging','pending','rebuilding'],
             paused: ['paused','paused_edit','paused_merge']
         };
 
@@ -2861,6 +2911,9 @@
                 'step2': { color: '#8b5cf6', bg: '#3b0764', label: '② 分镜' },
                 'step3': { color: '#8b5cf6', bg: '#3b0764', label: '③ 三视图' },
                 'step4': { color: '#8b5cf6', bg: '#3b0764', label: '④ 视频生成' },
+                'rebuilding': { color: '#8b5cf6', bg: '#3b0764', label: '🔄 恢复中' },
+                'paused_video': { color: '#3b82f6', bg: '#1e3a8a', label: '⏸ 待生成视频' },
+                'stopped': { color: '#6b7280', bg: '#1f2937', label: '⏹ 已停止' },
                 'merging': { color: '#8b5cf6', bg: '#3b0764', label: '⑤ 合并中' },
                 'pending': { color: '#6b7280', bg: '#1f2937', label: '⏳ 等待中' }
             };
@@ -2929,6 +2982,20 @@
             document.getElementById('dramaProgress').style.display = 'block';
             switchTab('drama');
             startDramaPolling();
+            // 回填任务原始描述到输入框（历史任务"短剧描述"随之恢复，可直接修改后重新生成）
+            try {
+                const resp = await fetch(`/api/drama/status/${dramaId}`);
+                const data = await resp.json();
+                if (data.success && data.prompt) {
+                    const ta = document.getElementById('dramaPrompt');
+                    if (ta && !ta.value.trim()) ta.value = data.prompt;
+                }
+            } catch (e) { /* 回填失败不影响主流程 */ }
+            // 滚动到进度/详情区，让用户立刻看到已恢复的故事/剧本/分镜/提示词
+            setTimeout(() => {
+                const el = document.getElementById('dramaProgress');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
             showToast('已打开历史短剧任务', 'info');
         }
 
@@ -3036,7 +3103,7 @@
                 const currentHash = hashParts.join('|');
                 if (currentHash === _lastDramaRenderHash) {
                     // 数据未变化，只更新进度条和步骤标签
-                    const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'paused_video': 65, 'step4': 75, 'completed': 100, 'failed': 100, 'stopped': 100 };
+                    const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'paused_video': 65, 'step4': 75, 'rebuilding': 75, 'completed': 100, 'failed': 100, 'stopped': 100 };
                     const progress = stepMap[data.status] || 5;
                     document.getElementById('dramaProgressBar').style.width = progress + '%';
                     if (data.status === 'failed') document.getElementById('dramaProgressBar').style.background = 'var(--error)';
@@ -3044,14 +3111,13 @@
                     if (data.status === 'stopped') document.getElementById('dramaProgressBar').style.background = 'var(--text2)';
                     const stepLabels = {
                         'pending': '等待中', 'step1': '① 生成故事+剧本...', 'paused_story': '⏸ 请确认故事梗概', 'step2': '② 生成分镜...',
-                        'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'paused_video': '⏸ 请逐个启动视频生成', 'step4': '④ 生成视频...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'stopped': '⏹ 已停止'
+                        'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'paused_video': '⏸ 请逐个启动视频生成', 'step4': '④ 生成视频...', 'rebuilding': '🔄 恢复分镜提示词...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'stopped': '⏹ 已停止'
                     };
                     document.getElementById('dramaStepBadge').textContent = stepLabels[data.status] || data.status;
                     document.getElementById('dramaMessage').textContent = data.message || '';
-                    // 完成或失败时停止轮询
+                    // 完成或失败时停止轮询（保留 currentDramaId，刷新后仍可回看任务详情）
                     if (data.status === 'completed' || data.status === 'failed') {
                         clearInterval(dramaPollingTimer);
-                        localStorage.removeItem('currentDramaId');
                         showToast(data.status === 'completed' ? '短剧生成完成！' : '短剧生成失败', data.status === 'completed' ? 'success' : 'error');
                     }
                     return;
@@ -3065,7 +3131,7 @@
                 }
 
                 // 更新进度条
-                const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'paused_video': 65, 'step4': 75, 'completed': 100, 'failed': 100, 'stopped': 100 };
+                const stepMap = { 'step1': 15, 'paused_story': 18, 'step2': 35, 'step3': 55, 'paused': 60, 'paused_video': 65, 'step4': 75, 'rebuilding': 75, 'completed': 100, 'failed': 100, 'stopped': 100 };
                 const progress = stepMap[data.status] || 5;
                 document.getElementById('dramaProgressBar').style.width = progress + '%';
                 if (data.status === 'failed') document.getElementById('dramaProgressBar').style.background = 'var(--error)';
@@ -3097,10 +3163,14 @@
                     document.getElementById('dramaVideosSection').style.display = 'block';
                 }
 
+                // 中断/终态任务：有分镜数据时显示"恢复分镜提示词"入口
+                const canRebuild = ['completed', 'failed', 'cancelled', 'stopped'].includes(data.status) && (data.shots_count || 0) > 0;
+                document.getElementById('dramaRebuildSection').style.display = canRebuild ? 'block' : 'none';
+
                 // 更新步骤标签
                 const stepLabels = {
                     'pending': '等待中', 'step1': '① 生成故事+剧本...', 'paused_story': '⏸ 请确认故事梗概', 'step2': '② 生成分镜...',
-                    'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'paused_video': '⏸ 请逐个启动视频生成', 'step4': '④ 生成视频...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'stopped': '⏹ 已停止'
+                    'step3': '③ 提取素材...', 'paused': '⏸ 请确认参考图', 'paused_video': '⏸ 请逐个启动视频生成', 'step4': '④ 生成视频...', 'rebuilding': '🔄 恢复分镜提示词...', 'completed': '✅ 完成', 'failed': '❌ 失败', 'stopped': '⏹ 已停止'
                 };
                 document.getElementById('dramaStepBadge').textContent = stepLabels[data.status] || data.status;
                 document.getElementById('dramaMessage').textContent = data.message || '';
@@ -3355,10 +3425,9 @@
                     }
                 }
 
-                // 完成或失败时停止轮询
+                // 完成或失败时停止轮询（保留 currentDramaId，刷新后仍可回看任务详情）
                 if (data.status === 'completed' || data.status === 'failed') {
                     clearInterval(dramaPollingTimer);
-                    localStorage.removeItem('currentDramaId');
                     showToast(data.status === 'completed' ? '短剧生成完成！' : '短剧生成失败', data.status === 'completed' ? 'success' : 'error');
                 }
             } catch (e) {

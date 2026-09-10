@@ -115,8 +115,12 @@ def load_drama_tasks():
             status = data.get('status', '')
             if status not in ('completed', 'failed', 'cancelled'):
                 data['status'] = 'failed'
-                data['message'] = '应用重启导致任务中断，请重新生成'
+                data['message'] = '应用重启导致任务中断，可点击「恢复分镜提示词」继续'
                 print(f"[短剧] 任务 {drama_id} 原状态 {status}，已标记为中断")
+            # shot_details 的 key 统一为字符串：JSON 落盘后 int key 会变 '1'，
+            # 若不归一化，重启后按 int 索引会取不到（自定义提示词/参考图静默失效）
+            if isinstance(data.get('shot_details'), dict):
+                data['shot_details'] = {str(k): v for k, v in data['shot_details'].items()}
             with drama_lock:
                 drama_tasks[drama_id] = data
             loaded += 1

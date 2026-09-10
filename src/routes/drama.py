@@ -147,6 +147,185 @@ CHARACTER_STYLES = {
             "professional concept art, balanced between realism and stylization. "
         ),
     },
+    'ghibli': {
+        'name': '吉卜力手绘',
+        'character': (
+            "Studio Ghibli style character design sheet, hand-drawn anime illustration, "
+            "warm nostalgic atmosphere, soft watercolor textures, detailed linework, "
+            "gentle natural lighting, lush pastel color palette, endearing character design. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "Studio Ghibli style scene design, hand-painted anime background art, "
+            "warm nostalgic atmosphere, lush greenery with soft watercolor textures, "
+            "gentle sunlight and sky, detailed painterly environment. "
+        ),
+        'prop': (
+            "Studio Ghibli style prop design sheet, hand-drawn anime object illustration, "
+            "warm craft details, soft watercolor shading, whimsical charming design, "
+            "gentle natural lighting. "
+        ),
+    },
+    'comic_us': {
+        'name': '美漫厚涂',
+        'character': (
+            "American comic book style character design sheet, bold ink linework, "
+            "heavy painterly shading, dynamic heroic proportions, high contrast dramatic lighting, "
+            "vibrant saturated colors, superhero comic aesthetic. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "American comic book style scene design, bold ink linework and painterly shading, "
+            "dramatic high contrast lighting, vibrant saturated colors, dynamic cinematic composition. "
+        ),
+        'prop': (
+            "American comic book style prop design sheet, bold ink outlines, heavy shading, "
+            "vibrant colors, dramatic lighting, iconic heroic weapon and gadget design. "
+        ),
+    },
+    'cyberpunk': {
+        'name': '赛博朋克',
+        'character': (
+            "cyberpunk style character design sheet, neon-lit futuristic aesthetics, "
+            "techwear outfit with glowing LED accents, cybernetic implants, "
+            "high contrast neon magenta and cyan lighting, dystopian sci-fi mood. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "cyberpunk city scene design, neon signs and holographic advertisements, "
+            "rain-soaked streets, dense futuristic skyscrapers, magenta and cyan neon lighting, "
+            "atmospheric fog, dystopian mood. "
+        ),
+        'prop': (
+            "cyberpunk prop design sheet, futuristic gadget with glowing neon accents, "
+            "weathered metal and carbon fiber materials, holographic display elements, "
+            "high tech dystopian device design. "
+        ),
+    },
+    'oil_painting': {
+        'name': '古典油画',
+        'character': (
+            "classical oil painting style character design sheet, rich impasto brushstrokes, "
+            "Renaissance master technique, dramatic chiaroscuro lighting, warm museum color palette, "
+            "timeless fine art portrait quality. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "classical oil painting style scene design, rich impasto brushstrokes, "
+            "dramatic chiaroscuro lighting, warm earthy color palette, atmospheric perspective, "
+            "timeless fine art landscape quality. "
+        ),
+        'prop': (
+            "classical oil painting style prop design sheet, rich impasto texture, "
+            "dramatic chiaroscuro lighting, warm earthy palette, meticulous still life rendering, "
+            "fine art quality. "
+        ),
+    },
+    'sketch': {
+        'name': '铅笔素描',
+        'character': (
+            "pencil sketch character design sheet, graphite linework on paper, "
+            "expressive hatched shading, loose construction lines, monochromatic graphite tones, "
+            "artist sketchbook aesthetic. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "pencil sketch scene design, graphite linework on paper, expressive hatching, "
+            "loose perspective construction lines, monochromatic tones, concept sketchbook aesthetic. "
+        ),
+        'prop': (
+            "pencil sketch prop design sheet, graphite linework, hatched shading and construction lines, "
+            "monochromatic tones, industrial design sketchbook aesthetic. "
+        ),
+    },
+    'claymation': {
+        'name': '黏土定格',
+        'character': (
+            "claymation stop-motion style character design sheet, hand-sculpted polymer clay figure, "
+            "visible fingerprints and soft clay texture, charming handmade details, "
+            "warm studio lighting with soft shadows, whimsical stop-motion aesthetic. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "claymation stop-motion style scene design, hand-sculpted clay miniature environment, "
+            "soft tactile textures, warm practical studio lighting, charming handcrafted set design. "
+        ),
+        'prop': (
+            "claymation stop-motion style prop design sheet, hand-sculpted polymer clay object, "
+            "soft tactile surface texture, visible handmade details, warm studio lighting. "
+        ),
+    },
+    'lowpoly': {
+        'name': '低多边形3D',
+        'character': (
+            "low poly 3D style character design sheet, faceted geometric surfaces, "
+            "clean polygonal modeling, flat matte colors, minimal stylized shapes, "
+            "modern indie game art aesthetic, soft ambient lighting. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "low poly 3D style scene design, faceted geometric terrain, flat matte colors, "
+            "clean polygonal environment modeling, minimal stylized shapes, soft ambient lighting, "
+            "indie game aesthetic. "
+        ),
+        'prop': (
+            "low poly 3D style prop design sheet, faceted geometric surfaces, clean polygonal modeling, "
+            "flat matte colors, minimal stylized shapes, indie game asset aesthetic. "
+        ),
+    },
+    'ukiyoe': {
+        'name': '浮世绘',
+        'character': (
+            "Japanese ukiyo-e woodblock print style character design sheet, bold flat color blocks, "
+            "strong black outline contours, decorative wave and cloud patterns, "
+            "traditional Edo period aesthetics, muted washi paper texture. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "Japanese ukiyo-e woodblock print style scene design, bold flat color blocks, "
+            "strong black outlines, decorative cloud and wave motifs, traditional Edo period landscape aesthetics, "
+            "washi paper texture. "
+        ),
+        'prop': (
+            "Japanese ukiyo-e woodblock print style prop design sheet, bold flat colors, strong black outlines, "
+            "decorative traditional patterns, Edo period craftsmanship, washi paper texture. "
+        ),
+    },
+    'pixel': {
+        'name': '像素游戏',
+        'character': (
+            "pixel art character design sheet, 16-bit retro game sprite aesthetic, crisp pixel grid, "
+            "limited vibrant color palette, clean readable silhouette, subtle dithering, "
+            "nostalgic arcade game style. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "pixel art scene design, 16-bit retro game background aesthetic, crisp pixel grid, "
+            "limited vibrant palette, layered parallax environment, nostalgic arcade game style. "
+        ),
+        'prop': (
+            "pixel art prop design sheet, 16-bit retro game item sprite, crisp pixel grid, "
+            "limited vibrant palette, clean readable silhouette, nostalgic arcade aesthetic. "
+        ),
+    },
+    'sci_fi': {
+        'name': '科幻机甲',
+        'character': (
+            "sci-fi mecha style character design sheet, futuristic armored suit with mechanical panel details, "
+            "metallic material rendering, glowing energy core accents, hard surface design, "
+            "dramatic rim lighting, epic space opera aesthetic. "
+            "9:16 vertical composition, pure white minimalist background, premium character design board layout. "
+        ),
+        'scene': (
+            "sci-fi space scene design, futuristic space station interior or alien planet environment, "
+            "metallic hard surface architecture, glowing holographic displays, dramatic cold blue lighting, "
+            "epic space opera aesthetic. "
+        ),
+        'prop': (
+            "sci-fi prop design sheet, futuristic weapon or device with hard surface panel details, "
+            "metallic materials, glowing energy accents, precise mechanical engineering design. "
+        ),
+    },
 }
 
 DEFAULT_CHARACTER_STYLE = 'anime'
@@ -264,6 +443,128 @@ drama_video_start_events = {}
 
 # ==================== 短剧流水线 ====================
 
+def _compute_shot_prompts(drama_id, shots, all_assets, is_cancelled=None, is_shutdown=None, keep_results=None):
+    """Step 4a 核心：为每个镜头预计算视频提示词与参考图（写入 shot_details / video_results），
+    完成后进入 paused_video 暂停，等待用户逐个启动视频生成。
+
+    供正常流水线与中断任务恢复（/api/drama/rebuild_prompts）共用。
+    keep_results: 旧的视频结果列表，其中已完成（有 local_file）的镜头在重算后予以保留，
+    避免恢复时丢失已生成的视频。
+    返回 video_results 列表；若被取消/关闭则返回 None。
+    """
+    def _u(**kwargs):
+        with drama_lock:
+            if drama_id in drama_tasks:
+                drama_tasks[drama_id].update(kwargs)
+        # 与流水线 _update 一致：状态变更立即落盘
+        save_drama_task(drama_id)
+
+    # 已完成镜头的保留映射（shot_index -> 旧结果）
+    keep_map = {}
+    if keep_results:
+        for v in keep_results:
+            if v.get('status') == 'completed' and v.get('local_file'):
+                keep_map[v.get('shot_index')] = v
+
+    print(f"[短剧 {drama_id}] Step 4a: 预计算所有镜头提示词和参考图...")
+    _u(status='step4', step='step4', message='开始逐镜头生成视频...')
+    video_results = []
+
+    for shot_idx, shot in enumerate(shots):
+        if is_shutdown and is_shutdown(): return None
+        if is_cancelled and is_cancelled(): return None
+        _u(message=f'生成视频 ({shot_idx+1}/{len(shots)}): 分镜 {shot.get("shot_index", shot_idx+1)}...')
+
+        shot_chars = [c.lower().strip() for c in shot.get('characters', [])]
+        shot_asset_list = []
+        primary_image = None
+
+        # 匹配角色素材
+        for asset in all_assets:
+            if not asset.get('image_url'):
+                continue
+            asset_name = asset.get('name', '').lower().strip()
+            if any(asset_name in c or c in asset_name for c in shot_chars):
+                shot_asset_list.append(asset)
+                if not primary_image:
+                    primary_image = asset['image_url']
+
+        # 匹配场景素材
+        for asset in all_assets:
+            if not asset.get('image_url') or asset.get('category') != 'scenes':
+                continue
+            asset_name = asset.get('name', '').lower().strip()
+            scene_desc = shot.get('scene_desc', '').lower()
+            if asset_name and asset_name in scene_desc:
+                shot_asset_list.append(asset)
+                if not primary_image:
+                    primary_image = asset['image_url']
+
+        # 匹配道具素材
+        for asset in all_assets:
+            if not asset.get('image_url') or asset.get('category') != 'props':
+                continue
+            asset_name = asset.get('name', '').lower().strip()
+            action_desc = shot.get('action', '').lower()
+            if asset_name and asset_name in action_desc:
+                shot_asset_list.append(asset)
+
+        # 如果没有主图，使用第一个角色素材
+        if not primary_image:
+            for asset in all_assets:
+                if asset.get('image_url') and asset.get('category') == 'characters':
+                    primary_image = asset['image_url']
+                    shot_asset_list.append(asset)
+                    break
+
+        video_prompt_en, video_prompt_cn = build_video_prompt(shot, shot_asset_list)
+        video_prompt = video_prompt_en
+        shot_ref_images = []
+        for a in shot_asset_list:
+            if a.get('image_url'):
+                shot_ref_images.append({
+                    'asset_name': a.get('name', ''),
+                    'category': a.get('category', ''),
+                    'image_url': a['image_url'],
+                    'local_file': a.get('local_file', '')
+                })
+        s_idx = shot.get('shot_index', shot_idx + 1)
+        # shot_details 的 key 统一用字符串：JSON 落盘后 int key 会变 '1'，重启后按 int 读会取不到
+        with drama_lock:
+            if 'shot_details' not in drama_tasks[drama_id]:
+                drama_tasks[drama_id]['shot_details'] = {}
+            drama_tasks[drama_id]['shot_details'][str(s_idx)] = {
+                'video_prompt': video_prompt_en,
+                'video_prompt_cn': video_prompt_cn,
+                'reference_images': shot_ref_images,
+                'primary_image': primary_image
+            }
+        prev = keep_map.get(s_idx)
+        if prev:
+            # 保留已生成的视频结果（视频文件在磁盘上仍然有效）
+            video_results.append({
+                'shot_index': s_idx, 'status': 'completed',
+                'video_url': prev.get('video_url', ''),
+                'local_file': prev.get('local_file', ''),
+                'prompt': video_prompt
+            })
+        else:
+            video_results.append({
+                'shot_index': s_idx,
+                'status': 'pending',
+                'prompt': video_prompt
+            })
+
+    with drama_lock:
+        drama_tasks[drama_id]['video_results'] = list(video_results)
+
+    # ---- Step 4b: 暂停让用户检查提示词和参考图，逐个启动视频生成 ----
+    _u(status='paused_video', step='paused_video',
+       message='素材已就绪，请检查分镜提示词和参考图，点击每个镜头的「生成视频」按钮逐个启动')
+    print(f"[短剧 {drama_id}] Step 4b: 等待用户逐个启动视频生成...")
+    return video_results
+
+
 def drama_pipeline(drama_id, api_key, text_api_key=None, cancel_event=None):
     """短剧生成 5 步流水线（后台线程执行）"""
     if text_api_key is None:
@@ -276,6 +577,10 @@ def drama_pipeline(drama_id, api_key, text_api_key=None, cancel_event=None):
         with drama_lock:
             if drama_id in drama_tasks:
                 drama_tasks[drama_id].update(kwargs)
+        # 状态变更立即落盘：保证应用重启或任务中断后能恢复全链路状态
+        # （故事/剧本/分镜/素材描述/分镜提示词/参考图/生成结果等）
+        # 注意：必须在 drama_lock 释放后调用，save_drama_task 内部会再次加锁
+        save_drama_task(drama_id)
 
     def _is_shutdown():
         return shutdown_event.is_set() or drama_stop_events.get(drama_id, threading.Event()).is_set()
@@ -563,94 +868,10 @@ def drama_pipeline(drama_id, api_key, text_api_key=None, cancel_event=None):
         # ---- Step 4a: 逐镜头生成视频（预计算提示词与参考图）----
         if _is_shutdown(): return
         if _is_cancelled(): return
-        print(f"[短剧 {drama_id}] Step 4a: 预计算所有镜头提示词和参考图...")
-        _update(status='step4', step='step4', message='开始逐镜头生成视频...')
-        shot_duration_to_frames = {5: 121, 10: 241, 18: 441}
-        num_frames = shot_duration_to_frames.get(shot_duration, 121)
-        video_results = []
-        
-        for shot_idx, shot in enumerate(shots):
-            if _is_shutdown(): return
-            if _is_cancelled(): return
-            _update(message=f'生成视频 ({shot_idx+1}/{len(shots)}): 分镜 {shot.get("shot_index", shot_idx+1)}...')
+        video_results = _compute_shot_prompts(drama_id, shots, all_assets, _is_cancelled, _is_shutdown)
+        if video_results is None:
+            return
 
-            shot_chars = [c.lower().strip() for c in shot.get('characters', [])]
-            shot_asset_list = []
-            primary_image = None
-        
-            # 匹配角色素材
-            for asset in all_assets:
-                if not asset.get('image_url'):
-                    continue
-                asset_name = asset.get('name', '').lower().strip()
-                if any(asset_name in c or c in asset_name for c in shot_chars):
-                    shot_asset_list.append(asset)
-                    if not primary_image:
-                        primary_image = asset['image_url']
-        
-            # 匹配场景素材
-            for asset in all_assets:
-                if not asset.get('image_url') or asset.get('category') != 'scenes':
-                    continue
-                asset_name = asset.get('name', '').lower().strip()
-                scene_desc = shot.get('scene_desc', '').lower()
-                if asset_name and asset_name in scene_desc:
-                    shot_asset_list.append(asset)
-                    if not primary_image:
-                        primary_image = asset['image_url']
-        
-            # 匹配道具素材
-            for asset in all_assets:
-                if not asset.get('image_url') or asset.get('category') != 'props':
-                    continue
-                asset_name = asset.get('name', '').lower().strip()
-                action_desc = shot.get('action', '').lower()
-                if asset_name and asset_name in action_desc:
-                    shot_asset_list.append(asset)
-        
-            # 如果没有主图，使用第一个角色素材
-            if not primary_image:
-                for asset in all_assets:
-                    if asset.get('image_url') and asset.get('category') == 'characters':
-                        primary_image = asset['image_url']
-                        shot_asset_list.append(asset)
-                        break
-        
-            video_prompt_en, video_prompt_cn = build_video_prompt(shot, shot_asset_list)
-            video_prompt = video_prompt_en
-            shot_ref_images = []
-            for a in shot_asset_list:
-                if a.get('image_url'):
-                    local_file = a.get('local_file', '')
-                    shot_ref_images.append({
-                        'asset_name': a.get('name', ''),
-                        'category': a.get('category', ''),
-                        'image_url': a['image_url'],
-                        'local_file': local_file
-                    })
-            with drama_lock:
-                if 'shot_details' not in drama_tasks[drama_id]:
-                    drama_tasks[drama_id]['shot_details'] = {}
-                drama_tasks[drama_id]['shot_details'][shot.get('shot_index', shot_idx+1)] = {
-                    'video_prompt': video_prompt_en,
-                    'video_prompt_cn': video_prompt_cn,
-                    'reference_images': shot_ref_images,
-                    'primary_image': primary_image
-                }
-            video_results.append({
-                'shot_index': shot.get('shot_index', shot_idx+1),
-                'status': 'pending',
-                'prompt': video_prompt
-            })
-        
-        with drama_lock:
-            drama_tasks[drama_id]['video_results'] = list(video_results)
-        
-        # ---- Step 4b: 暂停让用户检查提示词和参考图，逐个启动视频生成 ----
-        _update(status='paused_video', step='paused_video',
-                message='素材已就绪，请检查分镜提示词和参考图，点击每个镜头的「生成视频」按钮逐个启动')
-        print(f"[短剧 {drama_id}] Step 4b: 等待用户逐个启动视频生成...")
-        
         # 等待所有镜头视频生成完成（非阻塞，用户逐个点击启动）
         while True:
             if _is_cancelled(): return
@@ -743,6 +964,8 @@ def drama_start():
         drama_cancel_events[drama_id] = threading.Event()
 
     thread = threading.Thread(target=drama_pipeline, args=(drama_id, api_key, text_api_key, drama_cancel_events[drama_id]), daemon=True)
+    # 落盘初始任务状态，保证任务创建后立即可恢复
+    save_drama_task(drama_id)
     thread.start()
 
     return jsonify({'success': True, 'drama_id': drama_id, 'status': 'pending'})
@@ -766,6 +989,7 @@ def drama_stop():
             drama_tasks[drama_id]['status'] = 'stopped'
             drama_tasks[drama_id]['message'] = '用户已停止生成'
 
+    save_drama_task(drama_id)
     print(f"[短剧 {drama_id}] 用户请求停止")
     return jsonify({'success': True, 'message': '已发送停止信号'})
 
@@ -820,6 +1044,7 @@ def drama_story_confirm():
         drama['step'] = 'step1'
         drama['message'] = '故事已确认，正在生成剧本...'
 
+    save_drama_task(drama_id)
     story_edit_event.set()
     return jsonify({'success': True, 'message': '已确认，开始生成剧本...'})
 
@@ -843,6 +1068,7 @@ def drama_merge_confirm():
             return jsonify({'success': False, 'error': '当前状态无需确认'}), 400
         drama['wait_for_failed_shots'] = wait_for_retry
 
+    save_drama_task(drama_id)
     if wait_for_retry:
         print(f"[短剧 {drama_id}] 用户选择等待失败镜头重新生成")
     else:
@@ -872,6 +1098,7 @@ def drama_video_start():
         drama['step'] = 'step4'
         drama['message'] = '开始逐镜头生成视频...'
 
+    save_drama_task(drama_id)
     video_start_event.set()
     print(f"[短剧 {drama_id}] 用户点击启动视频生成，流水线已恢复")
     return jsonify({'success': True, 'message': '开始生成视频...'})
@@ -920,6 +1147,7 @@ def drama_merge_custom():
                 'shot_indices': valid_indices,
                 'merged_file': merged_file
             })
+        save_drama_task(drama_id)
         print(f"[短剧 {drama_id}] 自定义合并成功: {merged_file} (镜头顺序: {valid_indices})")
         return jsonify({'success': True, 'merged_file': merged_file, 'shot_indices': valid_indices})
     else:
@@ -1036,6 +1264,54 @@ def drama_cancel():
     return jsonify({'success': True, 'message': '已取消'})
 
 
+@drama_bp.route('/api/drama/rebuild_prompts', methods=['POST'])
+def drama_rebuild_prompts():
+    """中断/失败任务恢复：基于已保存的分镜与素材重新计算提示词与参考图，
+    完成后进入 paused_video，用户可检查并逐个启动视频生成（全链路状态保留的续跑入口）"""
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    if not drama_id:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        # 只允许从终态恢复（进行中的任务有自己的流水线线程）
+        if drama.get('status') not in ('completed', 'failed', 'cancelled', 'stopped'):
+            return jsonify({'success': False, 'error': f"任务状态为 {drama.get('status')}，无需恢复"}), 400
+        shots = drama.get('shots') or []
+        if not shots:
+            return jsonify({'success': False, 'error': '该任务没有分镜数据（多为历史迁移的空壳任务），无法恢复，请重新开始生成'}), 400
+        keep_results = [dict(v) for v in (drama.get('video_results') or [])]
+        drama['status'] = 'rebuilding'
+        drama['step'] = 'rebuilding'
+        drama['message'] = f'正在恢复 {len(shots)} 个镜头的提示词与参考图...'
+
+    save_drama_task(drama_id)
+
+    def _run_rebuild():
+        try:
+            with drama_lock:
+                assets = (drama_tasks.get(drama_id) or {}).get('assets') or []
+            result = _compute_shot_prompts(drama_id, shots, assets, keep_results=keep_results)
+            if result is None:
+                with drama_lock:
+                    if drama_id in drama_tasks:
+                        drama_tasks[drama_id].update({'status': 'stopped', 'message': '恢复已中止'})
+                save_drama_task(drama_id)
+        except Exception as e:
+            print(f"[短剧 {drama_id}] 恢复分镜提示词异常: {e}")
+            with drama_lock:
+                if drama_id in drama_tasks:
+                    drama_tasks[drama_id].update({'status': 'failed', 'message': f'恢复失败: {e}'})
+            save_drama_task(drama_id)
+
+    threading.Thread(target=_run_rebuild, daemon=True).start()
+    print(f"[短剧 {drama_id}] 用户触发恢复：重新计算 {len(shots)} 个镜头的提示词")
+    return jsonify({'success': True, 'message': f'开始恢复 {len(shots)} 个镜头的提示词'})
+
+
 @drama_bp.route('/api/drama/optimize-prompt', methods=['POST'])
 def drama_optimize_prompt():
     """AI一键优化提示词（合并 V7 时曾丢失，从本地 0da6f7e 恢复）"""
@@ -1049,12 +1325,26 @@ def drama_optimize_prompt():
         return jsonify({'success': False, 'error': '请先配置 API Key'}), 401
 
     try:
-        system = (
-            "你是一个专业的AI绘画提示词优化专家。用户会提供一个中文场景描述，"
-            "你需要将其优化为详细的英文提示词，包含构图、光影、色彩、风格等要素。"
-            "只输出优化后的英文提示词，不要解释。"
-        )
-        user = f"请将以下场景描述优化为详细的AI绘画英文提示词：\n{prompt}"
+        # 语言自适应：保持与输入一致的语言输出，便于用户阅读和二次编辑
+        # （中文提示词在提交生成时由后端自动翻译为英文，无需用户手工翻译）
+        input_is_cn = is_mostly_chinese(prompt)
+        if input_is_cn:
+            system = (
+                "你是一个专业的AI绘画/视频提示词优化专家。用户会提供一段中文画面描述，"
+                "你需要把它改写为更详细、更专业的中文提示词：补充主体外观与服饰、动作与表情、"
+                "构图与景别、镜头运动、光影氛围、色彩基调、画面风格等要素，语言自然通顺、信息密度高。"
+                "只输出优化后的中文提示词本身，不要解释、不要加引号或任何前缀。"
+            )
+            user = f"请将以下画面描述优化为详细专业的中文提示词：\n{prompt}"
+        else:
+            system = (
+                "You are a professional AI image/video prompt optimization expert. "
+                "Rewrite the user's prompt into a detailed, professional English prompt: "
+                "add subject appearance and outfit, action and expression, composition and shot size, "
+                "camera movement, lighting and atmosphere, color tone, and visual style. "
+                "Output only the optimized English prompt, no explanation, no quotes or prefix."
+            )
+            user = f"Please optimize the following description into a detailed professional English prompt:\n{prompt}"
         # 使用文本模型专用 API Key（与短剧流水线一致）
         text_model = data.get('text_model', DEFAULT_TEXT_MODEL)
         text_api_key = get_vendor_api_key(text_model, fallback_key=api_key)
@@ -1103,6 +1393,7 @@ def drama_asset_replace():
         assets[asset_index]['image_url'] = f'/dramas/{drama_id}/images/{filename}'
         drama['assets'] = list(assets)
 
+    save_drama_task(drama_id)
     print(f"[短剧 {drama_id}] 素材 {asset_index+1} 参考图已手动替换: {filename}")
     return jsonify({
         'success': True,
@@ -1152,19 +1443,29 @@ def drama_asset_regenerate():
         # 如果用户提供了自定义中文描述，替换原始 desc 并重建 prompt
         if custom_desc and custom_desc.strip():
             desc = custom_desc.strip()
-            # 同步更新 asset 中的 desc
+            # 同步更新 asset 中的 desc（保留中文原文，便于界面展示与二次编辑）
             with drama_lock:
                 assets[asset_index]['desc'] = desc
-            # 用新 desc 通过模板重建英文 prompt
+            # 中文描述先翻译为英文再拼入英文提示词模板，保证图像模型理解（与分镜视频一致）
+            desc_en = desc
+            if is_mostly_chinese(desc):
+                _tkey = drama.get('text_api_key', '') or api_key
+                try:
+                    _translated = translate_cn_to_en(desc, _tkey)
+                    if _translated:
+                        desc_en = _translated
+                except Exception as _te:
+                    print(f"[短剧 {drama_id}] 素材描述翻译失败: {_te}")
+            # 用英文 desc 通过模板重建英文 prompt
             if category == 'characters':
-                img_prompt, img_size = build_character_image_prompt(desc, character_style, custom_character_style)
+                img_prompt, img_size = build_character_image_prompt(desc_en, character_style, custom_character_style)
             elif category == 'scenes':
                 style_base = get_style_base('scene', character_style, custom_character_style)
                 img_prompt = (
                     f"{style_base}"
                     f"16:9 horizontal composition, pure white background border. "
                     f"Scene environment design concept art, multiple angles view. "
-                    f"Scene description: {desc}. "
+                    f"Scene description: {desc_en}. "
                     f"Highly detailed environment, consistent style, no characters."
                 )
                 img_size = '1344x768'
@@ -1175,7 +1476,7 @@ def drama_asset_regenerate():
                     f"9:16 vertical composition, pure white minimalist background, premium prop design board layout. "
                     f"Multiple views: front, side, back, top, detail close-ups. "
                     f"Material and texture details clearly visible. "
-                    f"Prop description: {desc}. "
+                    f"Prop description: {desc_en}. "
                     f"Consistent design, no deformation, high detail craftsmanship showcase."
                 )
                 img_size = '768x1344'
@@ -1253,6 +1554,7 @@ def drama_asset_regenerate():
             assets[asset_index]['desc'] = desc
             drama['assets'] = list(assets)
 
+        save_drama_task(drama_id)
         print(f"[短剧 {drama_id}] 素材 {asset_index+1} [{name}] 参考图已重新生成: {local}")
         return jsonify({
             'success': True,
@@ -1292,15 +1594,16 @@ def drama_shot_upload_image():
     image_url = f'/dramas/{drama_id}/images/{filename}'
     print(f"[短剧 {drama_id}] 镜头 {shot_index} 上传自定义参考图: {filename}")
 
-    # 添加到 shot_details 的参考图列表
+    # 添加到 shot_details 的参考图列表（key 统一为字符串，与 JSON 落盘格式一致）
     with drama_lock:
         drama = drama_tasks.get(drama_id)
         if drama:
             if 'shot_details' not in drama:
                 drama['shot_details'] = {}
-            if shot_index not in drama['shot_details']:
-                drama['shot_details'][shot_index] = {'video_prompt': '', 'video_prompt_cn': '', 'reference_images': [], 'primary_image': None}
-            shot_detail = drama['shot_details'][shot_index]
+            skey = str(shot_index)
+            if skey not in drama['shot_details']:
+                drama['shot_details'][skey] = {'video_prompt': '', 'video_prompt_cn': '', 'reference_images': [], 'primary_image': None}
+            shot_detail = drama['shot_details'][skey]
             # 添加新上传的参考图
             new_img = {
                 'asset_name': f'自定义_{filename[:10]}',
@@ -1315,6 +1618,7 @@ def drama_shot_upload_image():
             if not shot_detail.get('primary_image'):
                 shot_detail['primary_image'] = image_url
 
+    save_drama_task(drama_id)
     return jsonify({
         'success': True,
         'image_url': image_url,
@@ -1339,7 +1643,7 @@ def drama_shot_delete_image():
         drama = drama_tasks.get(drama_id)
         if not drama:
             return jsonify({'success': False, 'error': '任务不存在'}), 404
-        shot_detail = drama.get('shot_details', {}).get(shot_index)
+        shot_detail = drama.get('shot_details', {}).get(str(shot_index))
         if not shot_detail:
             return jsonify({'success': False, 'error': f'镜头 {shot_index} 无参考图信息'}), 404
         ref_images = shot_detail.get('reference_images', [])
@@ -1354,6 +1658,7 @@ def drama_shot_delete_image():
         if removed.get('image_url') == primary:
             shot_detail['primary_image'] = ref_images[0].get('image_url', '') if ref_images else None
 
+    save_drama_task(drama_id)
     return jsonify({'success': True, 'remaining': len(ref_images)})
 
 
@@ -1409,15 +1714,26 @@ def drama_shot_regenerate():
             video_results[result_idx] = {'shot_index': shot_index, 'status': 'generating'}
             drama['video_results'] = list(video_results)
 
-    # 启动后台线程生成视频（传入自定义参数）
+    # 立即落盘 generating 状态
+    save_drama_task(drama_id)
+
+    # 启动后台线程生成视频（传入自定义参数，包装函数保证生成结束后落盘）
     thread = threading.Thread(
-        target=_regenerate_shot_video,
+        target=_regen_shot_video_and_save,
         args=(drama_id, shot_index, target_shot, api_key, result_idx, custom_prompt, custom_images),
         daemon=True
     )
     thread.start()
 
     return jsonify({'success': True, 'shot_index': shot_index, 'message': '开始重新生成'})
+
+
+def _regen_shot_video_and_save(drama_id, shot_index, shot, api_key, result_idx, custom_prompt=None, custom_images=None):
+    """包装 _regenerate_shot_video：生成结束（成功/失败/异常）后统一落盘，保证结果不丢失"""
+    try:
+        _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, custom_prompt, custom_images)
+    finally:
+        save_drama_task(drama_id)
 
 
 def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, custom_prompt=None, custom_images=None):
@@ -1478,14 +1794,14 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, cust
                     primary_image = asset['image_url']
                     break
 
-    # 更新 shot_details 中的记录
+    # 更新 shot_details 中的记录（key 统一为字符串，与 JSON 落盘格式一致）
     with drama_lock:
         if 'shot_details' not in drama:
             drama['shot_details'] = {}
-        drama['shot_details'][shot_index] = {
+        drama['shot_details'][str(shot_index)] = {
             'video_prompt': video_prompt,
             'video_prompt_cn': video_prompt_cn,
-            'reference_images': custom_images or drama.get('shot_details', {}).get(shot_index, {}).get('reference_images', []),
+            'reference_images': custom_images or drama.get('shot_details', {}).get(str(shot_index), {}).get('reference_images', []),
             'primary_image': primary_image
         }
 
