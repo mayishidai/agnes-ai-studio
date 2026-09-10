@@ -403,17 +403,36 @@ def sanitize_image_prompt(prompt):
     return cleaned
 
 
-def build_video_prompt(shot, shot_assets):
-    """根据分镜和参考素材构建视频生成 prompt（强调角色外观一致性）
-    
+def build_video_prompt(shot, shot_assets, camera_move=None, shot_index=1, total_shots=0):
+    """根据分镜和参考素材构建视频生成 prompt（强调角色外观一致性 + 运镜指令）
+
+    Args:
+        shot: 分镜 dict（可含 camera_move_id 手动指定的运镜 id）
+        shot_assets: 该镜头匹配到的参考素材列表
+        camera_move: 运镜 dict（camera_moves.CAMERA_MOVES 元素）；None 时自动智能选择
+        shot_index: 镜头序号（1-based，用于自动选择与类内轮换）
+        total_shots: 总镜头数
+
     Returns:
-        (english_prompt, chinese_prompt) 元组
+        (english_prompt, chinese_prompt, camera_move) 三元组
+        camera_move 为实际使用的运镜（含 id/name/zh/en/neg），供前端展示与反向词拼接
     """
     base_prompt = shot.get('prompt_en', '') or shot.get('scene_desc', '')
     scene_desc_cn = shot.get('scene_desc', '')
-    
+
+    # 运镜：未指定时按分镜内容智能挑选（手动指定在 pick 内部优先）
+    if camera_move is None:
+        from .camera_moves import pick_camera_move, camera_segments, QUALITY_EN
+        camera_move = pick_camera_move(shot, shot_index, total_shots)
+    else:
+        from .camera_moves import camera_segments, QUALITY_EN
+    cam_en, cam_cn, cam_neg = camera_segments(camera_move)
+
     # 【重要】禁止视频模型生成任何文字/字幕，中文字幕由 ffmpeg 后期烧录
     en_prompt = "No text, no subtitles, no captions, no labels, no written words, no letters, no signs, no watermarks, no typography, no writing of any kind should appear anywhere in the video. Pure cinematic scene only. "
+
+    # 【运镜】镜头运动指令优先级最高，紧跟在防文字声明之后、画面内容之前
+    en_prompt += cam_en
     
     # 【角色一致性】在提示词开头强调必须严格匹配参考图
     if shot_assets:
@@ -423,8 +442,8 @@ def build_video_prompt(shot, shot_assets):
     
     en_prompt += base_prompt
     
-    # 中文提示词（供前端展示）
-    cn_prompt = scene_desc_cn or base_prompt
+    # 中文提示词（供前端展示），开头带运镜说明
+    cn_prompt = cam_cn + (scene_desc_cn or base_prompt)
     
     if shot_assets:
         char_descs = []
@@ -476,9 +495,11 @@ def build_video_prompt(shot, shot_assets):
             cn_prompt = f"{cn_prompt}. {' | '.join(consistency_parts_cn)}"
     
     en_prompt = f"{en_prompt}. The video MUST begin directly with the described natural cinematic scene. Never show any design sheet, character layout, three-view orthographic, or reference board in the video. Start immediately with the actual story scene."
+    # 通用质感关键词收尾（任何镜头都加）
+    en_prompt += " " + QUALITY_EN
     en_prompt = sanitize_video_prompt(en_prompt)
-    
-    return en_prompt, cn_prompt
+
+    return en_prompt, cn_prompt, camera_move
 
 
 def is_mostly_chinese(text):

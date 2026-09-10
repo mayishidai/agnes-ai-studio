@@ -443,6 +443,56 @@ drama_video_start_events = {}
 
 # ==================== 短剧流水线 ====================
 
+def _match_shot_assets(shot, all_assets):
+    """为分镜匹配参考素材（角色/场景/道具 + 主图兜底）
+    Returns:
+        (shot_asset_list, primary_image)
+    """
+    shot_chars = [c.lower().strip() for c in shot.get('characters', [])]
+    shot_asset_list = []
+    primary_image = None
+
+    # 匹配角色素材
+    for asset in all_assets:
+        if not asset.get('image_url'):
+            continue
+        asset_name = asset.get('name', '').lower().strip()
+        if any(asset_name in c or c in asset_name for c in shot_chars):
+            shot_asset_list.append(asset)
+            if not primary_image:
+                primary_image = asset['image_url']
+
+    # 匹配场景素材
+    for asset in all_assets:
+        if not asset.get('image_url') or asset.get('category') != 'scenes':
+            continue
+        asset_name = asset.get('name', '').lower().strip()
+        scene_desc = shot.get('scene_desc', '').lower()
+        if asset_name and asset_name in scene_desc:
+            shot_asset_list.append(asset)
+            if not primary_image:
+                primary_image = asset['image_url']
+
+    # 匹配道具素材
+    for asset in all_assets:
+        if not asset.get('image_url') or asset.get('category') != 'props':
+            continue
+        asset_name = asset.get('name', '').lower().strip()
+        action_desc = shot.get('action', '').lower()
+        if asset_name and asset_name in action_desc:
+            shot_asset_list.append(asset)
+
+    # 如果没有主图，使用第一个角色素材
+    if not primary_image:
+        for asset in all_assets:
+            if asset.get('image_url') and asset.get('category') == 'characters':
+                primary_image = asset['image_url']
+                shot_asset_list.append(asset)
+                break
+
+    return shot_asset_list, primary_image
+
+
 def _compute_shot_prompts(drama_id, shots, all_assets, is_cancelled=None, is_shutdown=None, keep_results=None):
     """Step 4a 核心：为每个镜头预计算视频提示词与参考图（写入 shot_details / video_results），
     完成后进入 paused_video 暂停，等待用户逐个启动视频生成。
@@ -475,49 +525,11 @@ def _compute_shot_prompts(drama_id, shots, all_assets, is_cancelled=None, is_shu
         if is_cancelled and is_cancelled(): return None
         _u(message=f'生成视频 ({shot_idx+1}/{len(shots)}): 分镜 {shot.get("shot_index", shot_idx+1)}...')
 
-        shot_chars = [c.lower().strip() for c in shot.get('characters', [])]
-        shot_asset_list = []
-        primary_image = None
+        shot_asset_list, primary_image = _match_shot_assets(shot, all_assets)
 
-        # 匹配角色素材
-        for asset in all_assets:
-            if not asset.get('image_url'):
-                continue
-            asset_name = asset.get('name', '').lower().strip()
-            if any(asset_name in c or c in asset_name for c in shot_chars):
-                shot_asset_list.append(asset)
-                if not primary_image:
-                    primary_image = asset['image_url']
-
-        # 匹配场景素材
-        for asset in all_assets:
-            if not asset.get('image_url') or asset.get('category') != 'scenes':
-                continue
-            asset_name = asset.get('name', '').lower().strip()
-            scene_desc = shot.get('scene_desc', '').lower()
-            if asset_name and asset_name in scene_desc:
-                shot_asset_list.append(asset)
-                if not primary_image:
-                    primary_image = asset['image_url']
-
-        # 匹配道具素材
-        for asset in all_assets:
-            if not asset.get('image_url') or asset.get('category') != 'props':
-                continue
-            asset_name = asset.get('name', '').lower().strip()
-            action_desc = shot.get('action', '').lower()
-            if asset_name and asset_name in action_desc:
-                shot_asset_list.append(asset)
-
-        # 如果没有主图，使用第一个角色素材
-        if not primary_image:
-            for asset in all_assets:
-                if asset.get('image_url') and asset.get('category') == 'characters':
-                    primary_image = asset['image_url']
-                    shot_asset_list.append(asset)
-                    break
-
-        video_prompt_en, video_prompt_cn = build_video_prompt(shot, shot_asset_list)
+        s_idx = shot.get('shot_index', shot_idx + 1)
+        video_prompt_en, video_prompt_cn, cam_move = build_video_prompt(
+            shot, shot_asset_list, shot_index=s_idx, total_shots=len(shots))
         video_prompt = video_prompt_en
         shot_ref_images = []
         for a in shot_asset_list:
@@ -528,7 +540,6 @@ def _compute_shot_prompts(drama_id, shots, all_assets, is_cancelled=None, is_shu
                     'image_url': a['image_url'],
                     'local_file': a.get('local_file', '')
                 })
-        s_idx = shot.get('shot_index', shot_idx + 1)
         # shot_details 的 key 统一用字符串：JSON 落盘后 int key 会变 '1'，重启后按 int 读会取不到
         with drama_lock:
             if 'shot_details' not in drama_tasks[drama_id]:
@@ -537,7 +548,9 @@ def _compute_shot_prompts(drama_id, shots, all_assets, is_cancelled=None, is_shu
                 'video_prompt': video_prompt_en,
                 'video_prompt_cn': video_prompt_cn,
                 'reference_images': shot_ref_images,
-                'primary_image': primary_image
+                'primary_image': primary_image,
+                'camera_move': cam_move.get('name', ''),
+                'camera_move_id': cam_move.get('id')
             }
         prev = keep_map.get(s_idx)
         if prev:
@@ -1662,6 +1675,85 @@ def drama_shot_delete_image():
     return jsonify({'success': True, 'remaining': len(ref_images)})
 
 
+@drama_bp.route('/api/drama/camera_moves', methods=['GET'])
+def drama_camera_moves():
+    """运镜词库（50 套 · 十大类），供前端下拉选择"""
+    from ..services.camera_moves import list_for_frontend
+    return jsonify({'success': True, 'groups': list_for_frontend()})
+
+
+@drama_bp.route('/api/drama/shot/set_camera', methods=['POST'])
+def drama_shot_set_camera():
+    """手动指定镜头运镜并重算该镜头视频提示词（不重新生成视频）
+    move_id: 0/None = 恢复智能匹配
+    """
+    data = request.get_json()
+    drama_id = data.get('drama_id')
+    shot_index = data.get('shot_index')
+    move_id = data.get('move_id')
+    if not drama_id or shot_index is None:
+        return jsonify({'success': False, 'error': '缺少 drama_id 或 shot_index'}), 400
+    shot_index = int(shot_index)
+
+    from ..services.camera_moves import get_move_by_id
+
+    with drama_lock:
+        drama = drama_tasks.get(drama_id)
+        if not drama:
+            return jsonify({'success': False, 'error': '任务不存在'}), 404
+        shots = drama.get('shots', [])
+        target_shot = None
+        for s in shots:
+            if s.get('shot_index', shots.index(s) + 1) == shot_index:
+                target_shot = s
+                break
+        if not target_shot:
+            return jsonify({'success': False, 'error': f'镜头 {shot_index} 不存在'}), 404
+
+        # 记录手动指定（0/None 表示智能匹配），pick_camera_move 内部会优先使用
+        target_shot['camera_move_id'] = int(move_id) if move_id else None
+
+        all_assets = drama.get('assets', [])
+        shot_asset_list, primary_image = _match_shot_assets(target_shot, all_assets)
+
+        if move_id:
+            cam_move = get_move_by_id(move_id)
+            video_prompt_en, video_prompt_cn, cam_move = build_video_prompt(
+                target_shot, shot_asset_list, camera_move=cam_move,
+                shot_index=shot_index, total_shots=len(shots))
+        else:
+            video_prompt_en, video_prompt_cn, cam_move = build_video_prompt(
+                target_shot, shot_asset_list, shot_index=shot_index, total_shots=len(shots))
+
+        if 'shot_details' not in drama:
+            drama['shot_details'] = {}
+        prev_detail = drama.get('shot_details', {}).get(str(shot_index), {})
+        drama['shot_details'][str(shot_index)] = {
+            'video_prompt': video_prompt_en,
+            'video_prompt_cn': video_prompt_cn,
+            'reference_images': prev_detail.get('reference_images', []),
+            'primary_image': prev_detail.get('primary_image') or primary_image,
+            'camera_move': cam_move.get('name', ''),
+            'camera_move_id': cam_move.get('id')
+        }
+        # 同步更新待生成镜头的 prompt（completed 的不动，视频已存在）
+        for v in drama.get('video_results', []):
+            if v.get('shot_index') == shot_index and v.get('status') == 'pending':
+                v['prompt'] = video_prompt_en
+
+    save_drama_task(drama_id)
+
+    return jsonify({
+        'success': True,
+        'shot_index': shot_index,
+        'camera_move': cam_move.get('name', ''),
+        'camera_move_id': cam_move.get('id'),
+        'camera_move_zh': cam_move.get('zh', ''),
+        'video_prompt': video_prompt_en,
+        'video_prompt_cn': video_prompt_cn
+    })
+
+
 @drama_bp.route('/api/drama/shot/regenerate', methods=['POST'])
 def drama_shot_regenerate():
     """启动/重新生成单个镜头视频（后台异步执行）
@@ -1752,6 +1844,7 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, cust
 
     # 使用自定义参数或自动匹配
     video_prompt_cn = ''
+    cam_move = None
     if custom_prompt:
         # 如果是中文提示词，先翻译为英文再发给视频模型
         if is_mostly_chinese(custom_prompt):
@@ -1771,7 +1864,9 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, cust
             asset_name = asset.get('name', '').lower().strip()
             if any(asset_name in c or c in asset_name for c in shot_chars):
                 shot_asset_list.append(asset)
-        video_prompt_en, video_prompt_cn = build_video_prompt(shot, shot_asset_list)
+        total_shots = len(drama.get('shots', []) or [])
+        video_prompt_en, video_prompt_cn, cam_move = build_video_prompt(
+            shot, shot_asset_list, shot_index=shot_index, total_shots=total_shots)
         video_prompt = video_prompt_en
 
     # 确定参考图：自定义列表 > 自动匹配
@@ -1802,7 +1897,9 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, cust
             'video_prompt': video_prompt,
             'video_prompt_cn': video_prompt_cn,
             'reference_images': custom_images or drama.get('shot_details', {}).get(str(shot_index), {}).get('reference_images', []),
-            'primary_image': primary_image
+            'primary_image': primary_image,
+            'camera_move': (cam_move or {}).get('name', ''),
+            'camera_move_id': (cam_move or {}).get('id')
         }
 
     try:
@@ -1826,11 +1923,16 @@ def _regenerate_shot_video(drama_id, shot_index, shot, api_key, result_idx, cust
                     'aspect_ratio': '16:9',
                 }
         else:
+            # 运镜反向词并入防文字反向词（旧模型支持 negative_prompt）
+            cam_neg = (cam_move or {}).get('neg', '')
+            neg_text = 'text, subtitles, captions, labels, letters, words, writing, watermark, signs, typography, English text, Chinese text, any text overlay'
+            if cam_neg:
+                neg_text += ', ' + cam_neg
             payload = {
                 'model': video_model, 'prompt': video_prompt,
                 'width': 1152, 'height': 768,
                 'num_frames': num_frames, 'frame_rate': 24,
-                'negative_prompt': 'text, subtitles, captions, labels, letters, words, writing, watermark, signs, typography, English text, Chinese text, any text overlay'
+                'negative_prompt': neg_text
             }
             if primary_image:
                 payload['image'] = primary_image
