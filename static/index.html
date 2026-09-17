@@ -799,6 +799,16 @@
                     <textarea class="form-textarea" id="dramaPrompt" placeholder="描述你想要的短剧内容...&#10;例如：一个女孩在雨中的公交站等车，一位老人递给她一把伞，两人相视而笑" style="min-height:120px;"></textarea>
                 </div>
 
+                <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <div>
+                            <div style="font-size:13px;font-weight:700;color:#fff;">🔥 爆款复刻 <span style="font-weight:400;font-size:11px;">· Hypit 能力</span></div>
+                            <div style="font-size:11px;color:rgba(255,255,255,0.85);">套用验证过的爆款结构，一键生成原版 + 多个变体任务（换人设/换场景/反转视角）</div>
+                        </div>
+                        <button class="btn btn-sm" onclick="openViralModal()" style="background:#fff;color:#667eea;border:none;font-weight:700;">开始复刻 →</button>
+                    </div>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">每个分镜时长</label>
@@ -1219,6 +1229,39 @@
             <div class="modal-actions">
                 <button class="btn" onclick="closeSettings()">取消</button>
                 <button class="btn btn-primary" onclick="saveApiKey()">💾 保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Viral Modal（爆款复刻 · Hypit 能力） -->
+    <div class="modal-overlay" id="viralModal">
+        <div class="modal" style="max-width:560px;max-height:88vh;overflow-y:auto;">
+            <div class="modal-title">🔥 爆款复刻 <span style="font-weight:400;font-size:12px;color:var(--text2);">· Hypit 能力：套爆款结构 + 量产变体</span></div>
+            <div class="form-group">
+                <label class="form-label">① 选择爆款结构</label>
+                <div id="viralTemplateList" style="display:grid;gap:8px;">
+                    <p style="font-size:12px;color:var(--text2);">加载中...</p>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">② 创作主题</label>
+                <input type="text" class="form-input" id="viralTopic" placeholder="例如：测评全网最火的 5 款 AI 视频工具 / 推广新款颈椎按摩仪 / 讲一个职场反转故事">
+            </div>
+            <div class="form-group">
+                <label class="form-label">③ 变体数量 <span style="font-weight:400;font-size:11px;color:var(--text2);">（原版 + N 个变体，每个变体独立任务，消耗各自额度）</span></label>
+                <select class="form-select" id="viralVariantCount" onchange="renderVariantInputs()">
+                    <option value="0">不生成变体（只做原版）</option>
+                    <option value="2" selected>2 个变体（推荐）</option>
+                    <option value="3">3 个变体</option>
+                    <option value="4">4 个变体</option>
+                    <option value="5">5 个变体</option>
+                </select>
+                <div id="variantInputs" style="margin-top:8px;display:grid;gap:6px;"></div>
+                <div class="form-hint">变体指令留空将自动使用默认策略（换人设/换场景/反转视角/换语言风格/换产品对象）</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeViralModal()">取消</button>
+                <button class="btn btn-primary" id="btnViralCreate" onclick="submitViral()">🔥 批量创建任务</button>
             </div>
         </div>
     </div>
@@ -2716,6 +2759,87 @@
             }
         }
 
+        // ===== 爆款复刻（Hypit 能力）=====
+        let _viralTemplates = null;
+        let _viralSelected = null;
+        function openViralModal() {
+            document.getElementById('viralModal').classList.add('show');
+            if (_viralTemplates) { renderViralTemplates(); renderVariantInputs(); }
+            else ensureViralTemplates(() => { renderViralTemplates(); renderVariantInputs(); });
+        }
+        function closeViralModal() {
+            document.getElementById('viralModal').classList.remove('show');
+        }
+        function ensureViralTemplates(cb) {
+            if (_viralTemplates) { if (cb) cb(); return; }
+            fetch('/api/drama/viral_templates').then(r => r.json()).then(d => {
+                if (d.success) {
+                    _viralTemplates = d.templates;
+                    _viralSelected = (_viralSelected || (_viralTemplates[0] || {}).key);
+                }
+                if (cb) cb();
+            }).catch(() => { if (cb) cb(); });
+        }
+        function renderViralTemplates() {
+            const box = document.getElementById('viralTemplateList');
+            if (!_viralTemplates) { box.innerHTML = '<p style="font-size:12px;color:var(--text2);">模板加载失败，请刷新重试</p>'; return; }
+            box.innerHTML = _viralTemplates.map(t => `
+                <div onclick="selectViralTemplate('${t.key}')" style="border:1px solid ${t.key === _viralSelected ? 'var(--accent)' : 'var(--border)'};background:${t.key === _viralSelected ? 'var(--surface2)' : 'var(--bg)'};border-radius:8px;padding:10px;cursor:pointer;">
+                    <div style="font-size:13px;font-weight:700;">${t.key === _viralSelected ? '✅ ' : ''}${t.name}</div>
+                    <div style="font-size:11px;color:var(--text2);margin-top:2px;">${t.desc}</div>
+                </div>
+            `).join('');
+        }
+        function selectViralTemplate(key) {
+            _viralSelected = key;
+            renderViralTemplates();
+        }
+        function renderVariantInputs() {
+            const n = parseInt(document.getElementById('viralVariantCount').value) || 0;
+            const box = document.getElementById('variantInputs');
+            let html = '';
+            for (let i = 1; i <= n; i++) {
+                html += `<input type="text" class="form-input viral-variant-input" data-idx="${i}" placeholder="变体${i} 指令（可选，留空用默认策略）：如 换成东北大哥人设 / 搬到古装宫廷 / 反转立场...">`;
+            }
+            box.innerHTML = html;
+        }
+        async function submitViral() {
+            const topic = document.getElementById('viralTopic').value.trim();
+            if (!topic) { showToast('请输入创作主题', 'error'); return; }
+            if (!_viralSelected) { showToast('请选择爆款结构', 'error'); return; }
+            const variantCount = parseInt(document.getElementById('viralVariantCount').value) || 0;
+            const variantInstructions = [...document.querySelectorAll('.viral-variant-input')]
+                .map(inp => inp.value.trim()).filter(Boolean);
+            const btn = document.getElementById('btnViralCreate');
+            btn.disabled = true; btn.textContent = '创建中...';
+            try {
+                const resp = await fetch('/api/drama/viral_create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        template: _viralSelected, topic: topic,
+                        variant_count: variantCount, variant_instructions: variantInstructions,
+                        shot_duration: document.getElementById('dramaShotDuration').value,
+                        text_model: document.getElementById('dramaTextModel').value,
+                        image_model: document.getElementById('dramaImageModel').value,
+                        video_model: document.getElementById('dramaVideoModel').value
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    closeViralModal();
+                    loadDramaList();
+                } else {
+                    showToast('创建失败: ' + (data.error || ''), 'error');
+                }
+            } catch (e) {
+                showToast('创建失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = '🔥 批量创建任务';
+            }
+        }
+
         function toggleShotPrompt(shotIndex) {
             const area = document.getElementById(`shot-prompt-area-${shotIndex}`);
             if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
@@ -2984,6 +3108,7 @@
                             <span style="font-size:11px;padding:3px 10px;border-radius:12px;color:${cfg.color};background:${cfg.bg};font-weight:600;">${cfg.label}</span>
                             <span style="font-size:10px;color:var(--text2);">${timeStr}</span>
                         </div>
+                        ${d.viral_group ? `<div style="font-size:10px;padding:2px 8px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;display:inline-block;align-self:flex-start;">🔥 ${d.viral_template || '爆款复刻'} · ${d.variant_label || ''}</div>` : ''}
                         <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${d.prompt || '(无描述)'}</div>
                         <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;">
                             ${shots > 0 ? `<span>🎬 ${completed}/${shots} 镜头</span>` : ''}

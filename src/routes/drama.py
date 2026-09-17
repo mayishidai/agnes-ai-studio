@@ -984,6 +984,94 @@ def drama_start():
     return jsonify({'success': True, 'drama_id': drama_id, 'status': 'pending'})
 
 
+@drama_bp.route('/api/drama/viral_templates', methods=['GET'])
+def drama_viral_templates():
+    """爆款结构模板列表（Hypit 能力：结构复用）"""
+    from ..services.viral import list_for_frontend
+    return jsonify({'success': True, 'templates': list_for_frontend()})
+
+
+@drama_bp.route('/api/drama/viral_create', methods=['POST'])
+def drama_viral_create():
+    """爆款复刻批量创建：1 个原版 + N 个变体任务（Hypit 能力：One workflow, N variants）
+
+    Body: {template, topic, variant_count, variant_instructions[], shot_duration,
+           text_model, image_model, video_model, character_style, custom_character_style}
+    """
+    from ..services.viral import get_template, build_viral_brief, build_variant_briefs
+
+    data = request.get_json()
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({'success': False, 'error': '请先配置 API Key'}), 401
+
+    template_key = data.get('template', '')
+    topic = data.get('topic', '').strip()
+    if not template_key or not get_template(template_key):
+        return jsonify({'success': False, 'error': '请选择有效的爆款结构模板'}), 400
+    if not topic:
+        return jsonify({'success': False, 'error': '请输入创作主题'}), 400
+
+    variant_count = max(0, min(5, int(data.get('variant_count', 2) or 0)))
+    custom_instructions = [s.strip() for s in (data.get('variant_instructions') or []) if s and s.strip()]
+    template = get_template(template_key)
+    viral_group = uuid.uuid4().hex[:12]
+
+    shot_duration = data.get('shot_duration', 5)
+    text_model = data.get('text_model', DEFAULT_TEXT_MODEL)
+    image_model = data.get('image_model', DEFAULT_IMAGE_MODEL)
+    video_model = data.get('video_model', DEFAULT_VIDEO_MODEL)
+    character_style = data.get('character_style', DEFAULT_CHARACTER_STYLE)
+    custom_character_style = data.get('custom_character_style', '').strip()
+    text_api_key = get_vendor_api_key(text_model, fallback_key=api_key)
+
+    # 组装任务列表：原版 + 变体
+    jobs = [('原版', build_viral_brief(template_key, topic))]
+    jobs += build_variant_briefs(template_key, topic, variant_count, custom_instructions)
+
+    created = []
+    with drama_lock:
+        for label, brief in jobs:
+            drama_id = uuid.uuid4().hex[:12]
+            drama_tasks[drama_id] = {
+                'drama_id': drama_id, 'status': 'pending', 'step': '',
+                'prompt': brief, 'shot_duration': shot_duration,
+                'text_model': text_model, 'image_model': image_model, 'video_model': video_model,
+                'character_style': character_style,
+                'custom_character_style': custom_character_style,
+                'text_api_key': text_api_key,
+                'script': None, 'story': None, 'storyboard': None, 'shots': [],
+                'assets': [], 'video_results': [], 'shot_details': {},
+                'wait_for_failed_shots': False, 'edited_story': '',
+                'message': '正在启动...', 'created_at': time.time(),
+                # 爆款复刻标记
+                'viral_group': viral_group, 'viral_template': template['name'],
+                'variant_label': label,
+            }
+            drama_pause_events[drama_id] = threading.Event()
+            drama_merge_pause_events[drama_id] = threading.Event()
+            drama_story_edit_events[drama_id] = threading.Event()
+            drama_video_start_events[drama_id] = threading.Event()
+            drama_asset_regen_events[drama_id] = {}
+            drama_cancel_events[drama_id] = threading.Event()
+            created.append(drama_id)
+
+    # 逐个落盘并启动流水线（串行创建，流水线各自并行）
+    for idx, drama_id in enumerate(created):
+        save_drama_task(drama_id)
+        thread = threading.Thread(
+            target=drama_pipeline,
+            args=(drama_id, api_key, text_api_key, drama_cancel_events[drama_id]),
+            daemon=True)
+        thread.start()
+
+    return jsonify({
+        'success': True, 'viral_group': viral_group,
+        'drama_ids': created, 'count': len(created),
+        'message': f'已创建 {len(created)} 个任务（{template["name"]}：原版 + {len(created)-1} 个变体）'
+    })
+
+
 @drama_bp.route('/api/drama/stop', methods=['POST'])
 def drama_stop():
     """停止短剧生成流水线"""
@@ -1225,6 +1313,9 @@ def drama_status(drama_id):
             'custom_merges': drama.get('custom_merges', []),
             'shots_count': len(drama.get('shots', [])),
             'completed_shots': sum(1 for v in drama.get('video_results', []) if v.get('status') == 'completed'),
+            'viral_group': drama.get('viral_group'),
+            'viral_template': drama.get('viral_template'),
+            'variant_label': drama.get('variant_label'),
             'created_at': drama['created_at']
         })
 
@@ -1243,6 +1334,9 @@ def drama_list():
                 'completed_shots': sum(1 for v in d.get('video_results', []) if v.get('status') == 'completed'),
                 'assets_count': len(d.get('assets', [])),
                 'message': d.get('message', ''),
+                'viral_group': d.get('viral_group'),
+                'viral_template': d.get('viral_template'),
+                'variant_label': d.get('variant_label'),
                 'created_at': d['created_at']
             })
         return jsonify({'success': True, 'dramas': items})
