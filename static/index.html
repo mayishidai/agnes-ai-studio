@@ -780,7 +780,10 @@
                             <span style="font-size:13px;font-weight:600;">📋 历史短剧任务</span>
                             <button class="btn btn-sm" id="btnToggleDramaList" onclick="toggleDramaList()" style="font-size:11px;padding:2px 8px;">▼ 展开</button>
                         </div>
-                        <button class="btn btn-sm" onclick="loadDramaList()">🔄 刷新</button>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <button class="btn btn-sm" id="btnCleanupDrama" onclick="cleanupDramas()" style="font-size:11px;padding:2px 8px;display:none;" title="清理已完成/失败/已取消的历史任务">🧹 清理终态</button>
+                            <button class="btn btn-sm" onclick="loadDramaList()">🔄 刷新</button>
+                        </div>
                     </div>
                     <div id="dramaListFilters" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
                         <button class="btn btn-sm drama-filter-btn" data-filter="all" style="font-size:11px;padding:3px 10px;background:var(--accent);border-color:var(--accent);">全部</button>
@@ -788,6 +791,10 @@
                         <button class="btn btn-sm drama-filter-btn" data-filter="failed" style="font-size:11px;padding:3px 10px;">❌ 失败</button>
                         <button class="btn btn-sm drama-filter-btn" data-filter="in_progress" style="font-size:11px;padding:3px 10px;">🔄 进行中</button>
                         <button class="btn btn-sm drama-filter-btn" data-filter="paused" style="font-size:11px;padding:3px 10px;">⏸ 暂停</button>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);margin-left:auto;cursor:pointer;">
+                            <input type="checkbox" id="dramaSelectAll" onchange="toggleSelectAllDramas(this.checked)" style="cursor:pointer;"> 全选
+                        </label>
+                        <button class="btn btn-sm" id="btnBatchDeleteDrama" onclick="batchDeleteDramas()" style="font-size:11px;padding:3px 10px;background:#7f1d1d;border-color:#991b1b;color:#fecaca;display:none;">🗑 删除选中 (<span id="dramaSelectedCount">0</span>)</button>
                     </div>
                     <div id="dramaListContainer" style="max-height:400px;overflow-y:auto;display:none;">
                         <p style="font-size:12px;color:var(--text2);padding:8px;">加载中...</p>
@@ -3100,21 +3107,30 @@
             const thumbHtml = d.thumbnail
                 ? `<div style="width:100%;height:100%;background-image:url('${d.thumbnail}');background-size:cover;background-position:center;border-radius:8px 8px 0 0;"></div>`
                 : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:linear-gradient(135deg, #1e293b 0%, #334155 100%);border-radius:8px 8px 0 0;">🎭</div>`;
+            const isRunning = ['step1','step2','step3','step4','merging','pending','rebuilding'].includes(d.status);
             return `
-                <div onclick="openDramaTask('${d.drama_id}')" style="background:var(--surface2);border-radius:8px;cursor:pointer;border:1px solid var(--border);transition:all 0.2s;overflow:hidden;display:flex;flex-direction:column;" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='none';this.style.boxShadow='none'">
-                    <div style="height:120px;overflow:hidden;">${thumbHtml}</div>
-                    <div style="padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <span style="font-size:11px;padding:3px 10px;border-radius:12px;color:${cfg.color};background:${cfg.bg};font-weight:600;">${cfg.label}</span>
-                            <span style="font-size:10px;color:var(--text2);">${timeStr}</span>
+                <div style="background:var(--surface2);border-radius:8px;border:1px solid var(--border);transition:all 0.2s;overflow:hidden;display:flex;flex-direction:column;position:relative;">
+                    <div onclick="openDramaTask('${d.drama_id}')" style="cursor:pointer;display:flex;flex-direction:column;flex:1;" onmouseover="this.parentElement.style.borderColor='var(--accent)';this.parentElement.style.transform='translateY(-2px)';this.parentElement.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.parentElement.style.borderColor='var(--border)';this.parentElement.style.transform='none';this.parentElement.style.boxShadow='none'">
+                        <div style="height:120px;overflow:hidden;position:relative;">${thumbHtml}</div>
+                        <div style="padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:6px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="font-size:11px;padding:3px 10px;border-radius:12px;color:${cfg.color};background:${cfg.bg};font-weight:600;">${cfg.label}</span>
+                                <span style="font-size:10px;color:var(--text2);">${timeStr}</span>
+                            </div>
+                            ${d.viral_group ? `<div style="font-size:10px;padding:2px 8px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;display:inline-block;align-self:flex-start;">🔥 ${d.viral_template || '爆款复刻'} · ${d.variant_label || ''}</div>` : ''}
+                            <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${d.prompt || '(无描述)'}</div>
+                            <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;">
+                                ${shots > 0 ? `<span>🎬 ${completed}/${shots} 镜头</span>` : ''}
+                                ${d.assets_count > 0 ? `<span>🖼 ${d.assets_count} 素材</span>` : ''}
+                                ${d.merged_video ? '<span>📹 已合并</span>' : ''}
+                            </div>
                         </div>
-                        ${d.viral_group ? `<div style="font-size:10px;padding:2px 8px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;display:inline-block;align-self:flex-start;">🔥 ${d.viral_template || '爆款复刻'} · ${d.variant_label || ''}</div>` : ''}
-                        <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${d.prompt || '(无描述)'}</div>
-                        <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;">
-                            ${shots > 0 ? `<span>🎬 ${completed}/${shots} 镜头</span>` : ''}
-                            ${d.assets_count > 0 ? `<span>🖼 ${d.assets_count} 素材</span>` : ''}
-                            ${d.merged_video ? '<span>📹 已合并</span>' : ''}
-                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-top:1px solid var(--border);background:rgba(0,0,0,0.15);">
+                        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;" onclick="event.stopPropagation();">
+                            <input type="checkbox" class="drama-card-check" value="${d.drama_id}" onchange="onDramaCardCheckChange()" style="cursor:pointer;"> 选择
+                        </label>
+                        <button onclick="event.stopPropagation();deleteDramaTask('${d.drama_id}', ${isRunning}, '${(d.prompt || '').replace(/'/g, "\\'").slice(0, 20)}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #7f1d1d;background:transparent;color:#f87171;cursor:pointer;" onmouseover="this.style.background='#7f1d1d';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#f87171'">🗑 删除</button>
                     </div>
                 </div>`;
         }
@@ -3132,6 +3148,7 @@
                 return;
             }
             container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">${filtered.map(renderDramaCard).join('')}</div>`;
+            updateDramaSelectionUI();
         }
 
         async function loadDramaList() {
@@ -3143,13 +3160,140 @@
                 if (!data.success || !data.dramas || !data.dramas.length) {
                     allDramasData = [];
                     container.innerHTML = '<p style="font-size:12px;color:var(--text2);padding:8px;">暂无历史短剧任务</p>';
+                    updateDramaSelectionUI();
                     return;
                 }
                 allDramasData = data.dramas.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
                 renderDramaList();
+                updateDramaSelectionUI();
             } catch (e) {
                 console.error('Failed to load drama list:', e);
                 container.innerHTML = '<p style="font-size:12px;color:var(--error);padding:8px;">加载失败</p>';
+            }
+        }
+
+        // ---------- 历史任务删除 ----------
+        function getSelectedDramaIds() {
+            return Array.from(document.querySelectorAll('.drama-card-check:checked')).map(cb => cb.value);
+        }
+
+        function onDramaCardCheckChange() {
+            const total = document.querySelectorAll('.drama-card-check').length;
+            const checked = getSelectedDramaIds().length;
+            const selAll = document.getElementById('dramaSelectAll');
+            if (selAll) {
+                selAll.checked = total > 0 && checked === total;
+                selAll.indeterminate = checked > 0 && checked < total;
+            }
+            updateDramaSelectionUI();
+        }
+
+        function toggleSelectAllDramas(checked) {
+            document.querySelectorAll('.drama-card-check').forEach(cb => { cb.checked = checked; });
+            updateDramaSelectionUI();
+        }
+
+        function updateDramaSelectionUI() {
+            const count = getSelectedDramaIds().length;
+            const btn = document.getElementById('btnBatchDeleteDrama');
+            const cnt = document.getElementById('dramaSelectedCount');
+            if (cnt) cnt.textContent = count;
+            if (btn) btn.style.display = count > 0 ? 'inline-block' : 'none';
+            // 存在终态任务时才显示"清理终态"
+            const cleanBtn = document.getElementById('btnCleanupDrama');
+            const hasFinished = allDramasData.some(d => ['completed','failed','cancelled','stopped'].includes(d.status));
+            if (cleanBtn) cleanBtn.style.display = hasFinished ? 'inline-block' : 'none';
+        }
+
+        async function deleteDramaTask(dramaId, isRunning, label) {
+            let force = false;
+            if (isRunning) {
+                if (!confirm(`任务「${label || dramaId}」正在运行中。\n\n强制删除会先取消流水线再清理磁盘文件（图片/视频），不可恢复。\n确认删除？`)) return;
+                force = true;
+            } else {
+                if (!confirm(`确认删除任务「${label || dramaId}」？\n\n该任务的图片、视频和记录将被永久清理，不可恢复。`)) return;
+            }
+            try {
+                const resp = await fetch('/api/drama/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_id: dramaId, force })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(data.message || '已删除', 'success');
+                    if (currentDramaId === dramaId) {
+                        currentDramaId = null;
+                        localStorage.removeItem('currentDramaId');
+                        const p = document.getElementById('dramaProgress');
+                        if (p) p.style.display = 'none';
+                    }
+                    loadDramaList();
+                } else {
+                    showToast(data.error || '删除失败', 'error');
+                }
+            } catch (e) {
+                showToast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        async function batchDeleteDramas() {
+            const ids = getSelectedDramaIds();
+            if (!ids.length) { showToast('请先勾选要删除的任务', 'info'); return; }
+            const running = ids.filter(id => {
+                const d = allDramasData.find(x => x.drama_id === id);
+                return d && ['step1','step2','step3','step4','merging','pending','rebuilding'].includes(d.status);
+            });
+            let force = false;
+            let msg = `确认删除选中的 ${ids.length} 个任务？\n\n图片、视频和记录将被永久清理，不可恢复。`;
+            if (running.length) {
+                msg += `\n\n其中 ${running.length} 个任务正在运行中，将先取消流水线再删除。`;
+                force = true;
+            }
+            if (!confirm(msg)) return;
+            try {
+                const resp = await fetch('/api/drama/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drama_ids: ids, force })
+                });
+                const data = await resp.json();
+                showToast(data.message || (data.success ? '已删除' : '删除失败'), data.success ? 'success' : 'error');
+                if (ids.includes(currentDramaId)) {
+                    currentDramaId = null;
+                    localStorage.removeItem('currentDramaId');
+                    const p = document.getElementById('dramaProgress');
+                    if (p) p.style.display = 'none';
+                }
+                const selAll = document.getElementById('dramaSelectAll');
+                if (selAll) { selAll.checked = false; selAll.indeterminate = false; }
+                loadDramaList();
+            } catch (e) {
+                showToast('批量删除失败: ' + e.message, 'error');
+            }
+        }
+
+        async function cleanupDramas() {
+            const finished = allDramasData.filter(d => ['completed','failed','cancelled','stopped'].includes(d.status));
+            if (!finished.length) { showToast('没有可清理的终态任务', 'info'); return; }
+            if (!confirm(`确认清理全部 ${finished.length} 个终态任务（已完成 / 失败 / 已取消 / 已停止）？\n\n图片、视频和记录将被永久清理，不可恢复。\n进行中与暂停中的任务不受影响。`)) return;
+            try {
+                const resp = await fetch('/api/drama/cleanup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scope: 'finished' })
+                });
+                const data = await resp.json();
+                showToast(data.message || (data.success ? '已清理' : '清理失败'), data.success ? 'success' : 'error');
+                if (data.deleted && data.deleted.includes(currentDramaId)) {
+                    currentDramaId = null;
+                    localStorage.removeItem('currentDramaId');
+                    const p = document.getElementById('dramaProgress');
+                    if (p) p.style.display = 'none';
+                }
+                loadDramaList();
+            } catch (e) {
+                showToast('清理失败: ' + e.message, 'error');
             }
         }
 

@@ -1371,6 +1371,106 @@ def drama_cancel():
     return jsonify({'success': True, 'message': '已取消'})
 
 
+def _delete_drama_dir(drama_id):
+    """删除任务在磁盘上的整个输出目录（images/videos/task.json）"""
+    import shutil
+    dir_path = os.path.join(get_app_dir(), 'dramas', drama_id)
+    if os.path.isdir(dir_path):
+        shutil.rmtree(dir_path, ignore_errors=True)
+        return True
+    return False
+
+
+@drama_bp.route('/api/drama/delete', methods=['POST'])
+def drama_delete():
+    """删除短剧任务（支持单个或批量）
+
+    Body: {drama_id: str} 或 {drama_ids: [str], force: bool}
+    - 正在运行的任务默认拒绝删除，需先取消；force=true 时强制取消并删除
+    - 删除同时清理磁盘目录（图片/视频/task.json），不可恢复
+    """
+    data = request.get_json() or {}
+    drama_ids = data.get('drama_ids')
+    if not drama_ids:
+        single = data.get('drama_id')
+        drama_ids = [single] if single else []
+    drama_ids = [d for d in drama_ids if d]
+    if not drama_ids:
+        return jsonify({'success': False, 'error': '缺少 drama_id'}), 400
+
+    force = bool(data.get('force'))
+    running_states = ('step1', 'step2', 'step3', 'step4', 'merging', 'pending', 'rebuilding')
+
+    deleted, skipped = [], []
+    for drama_id in drama_ids:
+        with drama_lock:
+            drama = drama_tasks.get(drama_id)
+            if not drama:
+                skipped.append({'drama_id': drama_id, 'reason': '任务不存在'})
+                continue
+            status = drama.get('status', '')
+            if status in running_states and not force:
+                skipped.append({'drama_id': drama_id, 'reason': f'任务正在进行中（{status}），请先取消'})
+                continue
+            # 强制删除运行中任务：先触发取消，避免流水线线程继续写盘
+            if status in running_states:
+                cancel_event = drama_cancel_events.get(drama_id)
+                if cancel_event:
+                    cancel_event.set()
+            drama_tasks.pop(drama_id, None)
+
+        drama_cancel_events.pop(drama_id, None)
+        _delete_drama_dir(drama_id)
+        deleted.append(drama_id)
+        print(f"[短剧 {drama_id}] 用户删除任务（状态 {status}），磁盘目录已清理")
+
+    return jsonify({
+        'success': bool(deleted),
+        'deleted': deleted,
+        'skipped': skipped,
+        'message': f'已删除 {len(deleted)} 个任务' + (f'，{len(skipped)} 个跳过' if skipped else ''),
+        'error': None if deleted else (skipped[0]['reason'] if skipped else '删除失败')
+    }), (200 if deleted else 400)
+
+
+@drama_bp.route('/api/drama/cleanup', methods=['POST'])
+def drama_cleanup():
+    """批量清理历史任务
+
+    Body: {scope: 'completed'|'failed'|'cancelled'|'finished'|'viral_group',
+           viral_group: str, drama_ids: [str]}
+    - scope=finished 清理所有已完成/失败/已取消/已停止的终态任务
+    - scope=viral_group 清理指定爆款分组下的全部任务
+    - scope=custom 按 drama_ids 精确清理
+    """
+    data = request.get_json() or {}
+    scope = data.get('scope', 'finished')
+    finished_states = ('completed', 'failed', 'cancelled', 'stopped')
+
+    with drama_lock:
+        if scope == 'custom':
+            targets = [d for d in (data.get('drama_ids') or []) if d in drama_tasks]
+        elif scope == 'viral_group':
+            vg = data.get('viral_group')
+            targets = [d for d, t in drama_tasks.items() if vg and t.get('viral_group') == vg]
+        elif scope in finished_states:
+            targets = [d for d, t in drama_tasks.items() if t.get('status') == scope]
+        else:  # finished：所有终态
+            targets = [d for d, t in drama_tasks.items() if t.get('status') in finished_states]
+
+        if not targets:
+            return jsonify({'success': False, 'error': '没有符合条件的任务'}), 400
+
+        for drama_id in targets:
+            drama_tasks.pop(drama_id, None)
+            drama_cancel_events.pop(drama_id, None)
+
+    for drama_id in targets:
+        _delete_drama_dir(drama_id)
+    print(f"[短剧] 批量清理 {len(targets)} 个任务（scope={scope}）")
+    return jsonify({'success': True, 'deleted': targets, 'message': f'已清理 {len(targets)} 个任务'})
+
+
 @drama_bp.route('/api/drama/rebuild_prompts', methods=['POST'])
 def drama_rebuild_prompts():
     """中断/失败任务恢复：基于已保存的分镜与素材重新计算提示词与参考图，
