@@ -1014,6 +1014,8 @@ def drama_viral_create():
 
     variant_count = max(0, min(5, int(data.get('variant_count', 2) or 0)))
     custom_instructions = [s.strip() for s in (data.get('variant_instructions') or []) if s and s.strip()]
+    # 每个变体可单独指定角色风格（空串=跟随统一风格）；索引 0 对应变体1
+    variant_styles = [str(s or '').strip() for s in (data.get('variant_styles') or [])]
     template = get_template(template_key)
     viral_group = uuid.uuid4().hex[:12]
 
@@ -1025,20 +1027,26 @@ def drama_viral_create():
     custom_character_style = data.get('custom_character_style', '').strip()
     text_api_key = get_vendor_api_key(text_model, fallback_key=api_key)
 
-    # 组装任务列表：原版 + 变体
-    jobs = [('原版', build_viral_brief(template_key, topic))]
-    jobs += build_variant_briefs(template_key, topic, variant_count, custom_instructions)
+    # 组装任务列表：原版 + 变体（变体可覆盖角色风格）
+    jobs = [('原版', build_viral_brief(template_key, topic), character_style, custom_character_style)]
+    for vi, (label, brief) in enumerate(build_variant_briefs(template_key, topic, variant_count, custom_instructions)):
+        v_style = variant_styles[vi] if vi < len(variant_styles) else ''
+        if v_style in ('', 'custom'):
+            # 空=跟随统一风格；custom 由统一风格的自定义描述兜底
+            jobs.append((label, brief, character_style, custom_character_style))
+        else:
+            jobs.append((label, brief, v_style, ''))
 
     created = []
     with drama_lock:
-        for label, brief in jobs:
+        for label, brief, job_style, job_custom_style in jobs:
             drama_id = uuid.uuid4().hex[:12]
             drama_tasks[drama_id] = {
                 'drama_id': drama_id, 'status': 'pending', 'step': '',
                 'prompt': brief, 'shot_duration': shot_duration,
                 'text_model': text_model, 'image_model': image_model, 'video_model': video_model,
-                'character_style': character_style,
-                'custom_character_style': custom_character_style,
+                'character_style': job_style,
+                'custom_character_style': job_custom_style,
                 'text_api_key': text_api_key,
                 'script': None, 'story': None, 'storyboard': None, 'shots': [],
                 'assets': [], 'video_results': [], 'shot_details': {},
@@ -1316,6 +1324,8 @@ def drama_status(drama_id):
             'viral_group': drama.get('viral_group'),
             'viral_template': drama.get('viral_template'),
             'variant_label': drama.get('variant_label'),
+            'character_style': drama.get('character_style', DEFAULT_CHARACTER_STYLE),
+            'custom_character_style': drama.get('custom_character_style', ''),
             'created_at': drama['created_at']
         })
 
@@ -1337,6 +1347,7 @@ def drama_list():
                 'viral_group': d.get('viral_group'),
                 'viral_template': d.get('viral_template'),
                 'variant_label': d.get('variant_label'),
+                'character_style': d.get('character_style', DEFAULT_CHARACTER_STYLE),
                 'created_at': d['created_at']
             })
         return jsonify({'success': True, 'dramas': items})

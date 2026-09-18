@@ -1266,6 +1266,34 @@
                 <div id="variantInputs" style="margin-top:8px;display:grid;gap:6px;"></div>
                 <div class="form-hint">变体指令留空将自动使用默认策略（换人设/换场景/反转视角/换语言风格/换产品对象）</div>
             </div>
+            <div class="form-group">
+                <label class="form-label">④ 🎨 角色风格 <span style="font-weight:400;font-size:11px;color:var(--text2);">（原版与变体统一使用；变体可单独指定）</span></label>
+                <select class="form-select" id="viralCharacterStyle" onchange="toggleViralCustomStyle()">
+                    <option value="">跟随主表单设置</option>
+                    <option value="anime">动漫卡通</option>
+                    <option value="realistic">写实真人</option>
+                    <option value="pixar3d">皮克斯3D</option>
+                    <option value="semi_realistic">半写实插画</option>
+                    <option value="watercolor">水彩手绘</option>
+                    <option value="ink">中国水墨</option>
+                    <option value="ghibli">吉卜力手绘</option>
+                    <option value="comic_us">美漫厚涂</option>
+                    <option value="cyberpunk">赛博朋克</option>
+                    <option value="sci_fi">科幻机甲</option>
+                    <option value="oil_painting">古典油画</option>
+                    <option value="ukiyoe">浮世绘</option>
+                    <option value="sketch">铅笔素描</option>
+                    <option value="claymation">黏土定格</option>
+                    <option value="lowpoly">低多边形3D</option>
+                    <option value="pixel">像素游戏</option>
+                    <option value="custom">自定义风格...</option>
+                </select>
+                <input type="text" class="form-input" id="viralCustomCharacterStyle" placeholder="请输入自定义角色风格描述，例如：赛博朋克风格、复古油画风格..." style="display:none;margin-top:6px;">
+                <div id="viralVariantStyleWrap" style="margin-top:8px;display:none;gap:6px;grid-template-columns:1fr;">
+                    <div class="form-hint" style="margin:0 0 2px 0;">变体单独风格（留空则该变体跟随上面的统一风格）：</div>
+                    <div id="viralVariantStyles" style="display:grid;gap:6px;"></div>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeViralModal()">取消</button>
                 <button class="btn btn-primary" id="btnViralCreate" onclick="submitViral()">🔥 批量创建任务</button>
@@ -2801,6 +2829,21 @@
             _viralSelected = key;
             renderViralTemplates();
         }
+        const VIRAL_STYLE_OPTIONS = [
+            ['', '跟随统一风格'], ['anime', '动漫卡通'], ['realistic', '写实真人'],
+            ['pixar3d', '皮克斯3D'], ['semi_realistic', '半写实插画'], ['watercolor', '水彩手绘'],
+            ['ink', '中国水墨'], ['ghibli', '吉卜力手绘'], ['comic_us', '美漫厚涂'],
+            ['cyberpunk', '赛博朋克'], ['sci_fi', '科幻机甲'], ['oil_painting', '古典油画'],
+            ['ukiyoe', '浮世绘'], ['sketch', '铅笔素描'], ['claymation', '黏土定格'],
+            ['lowpoly', '低多边形3D'], ['pixel', '像素游戏']
+        ];
+
+        function toggleViralCustomStyle() {
+            const v = document.getElementById('viralCharacterStyle').value;
+            const inp = document.getElementById('viralCustomCharacterStyle');
+            if (inp) inp.style.display = v === 'custom' ? 'block' : 'none';
+        }
+
         function renderVariantInputs() {
             const n = parseInt(document.getElementById('viralVariantCount').value) || 0;
             const box = document.getElementById('variantInputs');
@@ -2809,6 +2852,35 @@
                 html += `<input type="text" class="form-input viral-variant-input" data-idx="${i}" placeholder="变体${i} 指令（可选，留空用默认策略）：如 换成东北大哥人设 / 搬到古装宫廷 / 反转立场...">`;
             }
             box.innerHTML = html;
+            // 变体单独风格：仅在生成变体时显示
+            const wrap = document.getElementById('viralVariantStyleWrap');
+            const styleBox = document.getElementById('viralVariantStyles');
+            if (n > 0) {
+                wrap.style.display = 'grid';
+                let shtml = '';
+                for (let i = 1; i <= n; i++) {
+                    const opts = VIRAL_STYLE_OPTIONS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+                    shtml += `<div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:11px;color:var(--text2);white-space:nowrap;min-width:44px;">变体${i}</span>
+                        <select class="form-select viral-variant-style" data-idx="${i}" style="flex:1;font-size:12px;padding:4px 8px;">${opts}</select>
+                    </div>`;
+                }
+                styleBox.innerHTML = shtml;
+            } else {
+                wrap.style.display = 'none';
+                styleBox.innerHTML = '';
+            }
+        }
+
+        /** 读取爆款弹窗的角色风格配置 */
+        function getViralStyleConfig() {
+            const sel = document.getElementById('viralCharacterStyle');
+            const unified = sel ? sel.value : '';
+            const custom = (document.getElementById('viralCustomCharacterStyle')?.value || '').trim();
+            // 变体单独风格：按序取值，空串表示跟随统一风格
+            const variantStyles = [...document.querySelectorAll('.viral-variant-style')]
+                .map(s => s.value || '');
+            return { unified, custom, variantStyles };
         }
         async function submitViral() {
             const topic = document.getElementById('viralTopic').value.trim();
@@ -2817,6 +2889,16 @@
             const variantCount = parseInt(document.getElementById('viralVariantCount').value) || 0;
             const variantInstructions = [...document.querySelectorAll('.viral-variant-input')]
                 .map(inp => inp.value.trim()).filter(Boolean);
+            // 角色风格：弹窗内未选择则回退到主表单设置
+            const styleCfg = getViralStyleConfig();
+            const mainStyle = document.getElementById('dramaCharacterStyle')?.value || 'anime';
+            const mainCustom = (document.getElementById('dramaCustomCharacterStyle')?.value || '').trim();
+            const characterStyle = styleCfg.unified || mainStyle;
+            const customCharacterStyle = styleCfg.unified
+                ? (styleCfg.unified === 'custom' ? styleCfg.custom : '')
+                : (mainStyle === 'custom' ? mainCustom : '');
+            // 变体单独风格：索引 0 对应变体1（不含原版）
+            const variantStyles = Array.from({ length: variantCount }, (_, i) => styleCfg.variantStyles[i] || '');
             const btn = document.getElementById('btnViralCreate');
             btn.disabled = true; btn.textContent = '创建中...';
             try {
@@ -2829,7 +2911,10 @@
                         shot_duration: document.getElementById('dramaShotDuration').value,
                         text_model: document.getElementById('dramaTextModel').value,
                         image_model: document.getElementById('dramaImageModel').value,
-                        video_model: document.getElementById('dramaVideoModel').value
+                        video_model: document.getElementById('dramaVideoModel').value,
+                        character_style: characterStyle,
+                        custom_character_style: customCharacterStyle,
+                        variant_styles: variantStyles
                     })
                 });
                 const data = await resp.json();
@@ -3108,6 +3193,8 @@
                 ? `<div style="width:100%;height:100%;background-image:url('${d.thumbnail}');background-size:cover;background-position:center;border-radius:8px 8px 0 0;"></div>`
                 : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:linear-gradient(135deg, #1e293b 0%, #334155 100%);border-radius:8px 8px 0 0;">🎭</div>`;
             const isRunning = ['step1','step2','step3','step4','merging','pending','rebuilding'].includes(d.status);
+            const STYLE_NAMES = { anime:'动漫卡通', realistic:'写实真人', pixar3d:'皮克斯3D', semi_realistic:'半写实插画', watercolor:'水彩手绘', ink:'中国水墨', ghibli:'吉卜力手绘', comic_us:'美漫厚涂', cyberpunk:'赛博朋克', sci_fi:'科幻机甲', oil_painting:'古典油画', ukiyoe:'浮世绘', sketch:'铅笔素描', claymation:'黏土定格', lowpoly:'低多边形3D', pixel:'像素游戏', custom:'自定义风格' };
+            const styleName = STYLE_NAMES[d.character_style] || d.character_style || '';
             return `
                 <div style="background:var(--surface2);border-radius:8px;border:1px solid var(--border);transition:all 0.2s;overflow:hidden;display:flex;flex-direction:column;position:relative;">
                     <div onclick="openDramaTask('${d.drama_id}')" style="cursor:pointer;display:flex;flex-direction:column;flex:1;" onmouseover="this.parentElement.style.borderColor='var(--accent)';this.parentElement.style.transform='translateY(-2px)';this.parentElement.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.parentElement.style.borderColor='var(--border)';this.parentElement.style.transform='none';this.parentElement.style.boxShadow='none'">
@@ -3119,10 +3206,11 @@
                             </div>
                             ${d.viral_group ? `<div style="font-size:10px;padding:2px 8px;border-radius:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;display:inline-block;align-self:flex-start;">🔥 ${d.viral_template || '爆款复刻'} · ${d.variant_label || ''}</div>` : ''}
                             <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${d.prompt || '(无描述)'}</div>
-                            <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;">
+                            <div style="display:flex;gap:8px;font-size:10px;color:var(--text2);margin-top:auto;flex-wrap:wrap;">
                                 ${shots > 0 ? `<span>🎬 ${completed}/${shots} 镜头</span>` : ''}
                                 ${d.assets_count > 0 ? `<span>🖼 ${d.assets_count} 素材</span>` : ''}
                                 ${d.merged_video ? '<span>📹 已合并</span>' : ''}
+                                ${styleName ? `<span style="padding:1px 6px;border-radius:8px;background:var(--surface);border:1px solid var(--border);">🎨 ${styleName}</span>` : ''}
                             </div>
                         </div>
                     </div>
